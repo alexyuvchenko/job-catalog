@@ -89,7 +89,49 @@ The chips above the list show how each site did in the last saved refresh:
 | Amber, with a count | Only part of the site was read. Its older vacancies were kept. |
 | Red, «помилка» | The site could not be read. Its older vacancies were kept. Hover for the reason. |
 
-In the last column, «підтверджено» means the site or its badge states the reservation. «без бейджа» means the DOU vacancy page could not be checked. «знято» means the vacancy is no longer listed at its source.
+In the reservation column, «підтверджено» (“confirmed”) means the site or its badge states the reservation. «без бейджа» (“no badge”) means the DOU vacancy page could not be checked. «знято» (“closed”) means the vacancy is no longer listed at its source.
+
+### Language
+
+The page is in Ukrainian and English. The UK/EN switch in the corner is remembered in a cookie. Without a choice, the browser's language decides: English for `en`, Ukrainian otherwise. You can also open `/?lang=en`. The saved HTML report is Ukrainian. Tooltips that come from a site (the reservation evidence) and error messages from a failed refresh stay in the language they were written in.
+
+### What changed in the last refresh
+
+Each refresh is compared with the one before it, so you can see what moved. A coloured edge on the row and a tag next to the title show it:
+
+| Mark | Meaning |
+| --- | --- |
+| green, «нова» / “new” | The vacancy first appeared in the last refresh. |
+| amber, «змінено» / “changed” | Title, company, place, format, salary, English level, experience, category, or reservation changed. Hover the tag to see which. A vacancy that was closed and came back also counts. |
+| red, «знято» / “closed” | The vacancy disappeared from its source in the last refresh. It shows only with «Показати вакансії, яких уже немає» ticked, or when you filter by closed. |
+| grey background | You already opened it. |
+| blue «EN» | The description is written in English. |
+
+Dates and text snippets are not compared, because relative dates such as “2 weeks ago” change every day. The numbers in the status line above the list (“added 10, changed 1, closed 3”) link to the matching filter. The first refresh has nothing to compare with, so nothing is marked until the second one finishes.
+
+### Your own marks
+
+Every row has buttons that save at once, without leaving the page:
+
+- ♥ favorite
+- ✕ «не для мене» (“not for me”): hides the vacancy. A toast offers Undo. A vacancy is either a favorite or not for you, so one clears the other.
+- ✓ viewed. Opening the title also marks it viewed. Press ✓ again to unmark.
+- ★ rating from 1 to 5. Press the same star again to clear it.
+
+Marks are stored in `data/catalog.sqlite` by link and survive refreshes. If a vacancy disappears and returns, its marks are still there. The page has no login, so anyone who can open it can change the marks. See [Open it on a phone](#open-it-on-a-phone).
+
+### Filters and pages
+
+Besides the text, source, salary, English, experience, and remote filters, you can narrow by:
+
+| Filter | Options |
+| --- | --- |
+| My marks | all except «не для мене» (default), everything, favorites, not viewed, viewed, rated, only «не для мене» |
+| My rating from | 1★ and up, up to 5★ |
+| Changes in the last refresh | added, changed, closed |
+| Description language | English, Ukrainian |
+
+Filters apply when you change a select or press «Застосувати». On a phone the filters and the legend start folded, with the number of active filters in the title. The list shows 25, 50 (default), 100, or 200 rows per page. Use the page links, or press «Показати ще» to add the next rows under the current ones without reloading.
 
 ### Open it on a phone
 
@@ -103,7 +145,7 @@ The log prints the address to use, for example `http://192.168.1.20:8765`. You c
 
 - The page has no login. Anyone on the same network can read the list, so use this only on a network you trust.
 - Only an IP address works in the browser. Names other than `localhost` are rejected.
-- Other devices can read and filter the list. «Оновити зараз» is disabled for them, because a refresh opens Chrome on the computer running the service. Use it on that computer.
+- Other devices can read, filter, and mark vacancies (favorite, viewed, and so on), so a phone and the computer share the same marks. «Оновити зараз» is disabled for them, because a refresh opens Chrome on the computer running the service. Use it on that computer.
 - Guest Wi-Fi often blocks devices from reaching each other. If the phone cannot connect, try the main network.
 - For access away from home without opening your network, run a private tunnel such as [Tailscale](https://tailscale.com/) on both devices. Its `100.x.x.x` addresses are accepted.
 
@@ -113,7 +155,10 @@ Ctrl+C finishes the site already in progress, closes Chrome, and saves the sites
 | --- | --- |
 | `GET /` | The catalog page. |
 | `GET /health` | Whether a refresh is running, stored counts, the last finish time, and the last error. `GET /api/status` is the same. It answers 503 when the database cannot be read. |
-| `GET /api/jobs` | The filtered list as JSON. Query parameters match the page: `q`, `source`, `min_salary`, `english`, `min_years`, `full_remote_only`, `include_inactive`. |
+| `GET /?page=2&per_page=100` | A page of the list. `per_page` is 25, 50, 100, or 200. Other values fall back to the default. |
+| `GET /api/jobs` | The filtered list as JSON, not paged. It adds `active`, `change`, `changes`, `language`, `favorite`, `hidden`, `rating`, and `viewed` to each vacancy. Query parameters match the page: `q`, `source`, `min_salary`, `english`, `min_years`, `full_remote_only`, `include_inactive`, `mine` (`all`, `favorites`, `unviewed`, `viewed`, `rated`, `hidden`), `min_rating`, `change` (`added`, `changed`, `closed`), `language` (`en`, `uk`). |
+| `POST /api/jobs/state` | Saves your marks. JSON body: `url` and any of `favorite`, `hidden`, `rating` (0 to 5), `viewed`. Omitted fields stay as they are. Answers with the stored marks, or 404 for an unknown vacancy. Only accepted from the page's own origin. |
+| `GET /fragments/rows` | The next rows as JSON for «Показати ще». Takes the same query as the page. |
 | `GET /docs` | Interactive API docs. |
 | `POST /refresh` | Starts a refresh when one is not already running, then returns to `/`. |
 
@@ -126,7 +171,7 @@ The package is `src/jobsearch`, with tests in `tests/`.
 - `sources` — one module per job board
 - `http` — page fetch and off-screen Chrome
 - `db` — the SQLite catalog and the shared SQLite settings
-- `web` — the catalog page and the API
+- `web` — the server and API (`server.py`), the catalog page (`pages.py`, `rows.py`, `styles.py`, `script.py`), the Ukrainian and English text (`i18n.py`), and the saved report (`report.py`)
 - `search.py`, `service.py`, `cli.py` — a one-off search, the refresh loop, and the command
 
 `uv run job-search` is the command. `uv run python -m jobsearch` does the same thing.

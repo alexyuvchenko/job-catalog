@@ -80,6 +80,28 @@ _EVIDENCE = re.compile(
 )
 
 
+_CYRILLIC = re.compile(r"[А-Яа-яЇїІіЄєҐґ]")
+_LATIN = re.compile(r"[A-Za-z]")
+
+
+def detect_language(text: str) -> str:
+    """ "en" or "uk" for a description, or "" when it is too short or mixed to say.
+
+    Ukrainian descriptions carry Latin tech words (Python, React), so only a text that is
+    almost entirely Latin counts as English.
+    """
+    cyrillic = len(_CYRILLIC.findall(text or ""))
+    latin = len(_LATIN.findall(text or ""))
+    if cyrillic + latin < 40:
+        return ""
+    share = latin / (cyrillic + latin)
+    if share >= 0.85:
+        return "en"
+    if share <= 0.4:
+        return "uk"
+    return ""
+
+
 def is_it_role(title: str, category: str, focus: str) -> bool:
     if focus == "all":
         return True

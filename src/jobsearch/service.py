@@ -97,7 +97,7 @@ class CatalogService:
                 stats.deactivated,
             )
             try:
-                stored = self.catalog.list_jobs(CatalogFilters())
+                stored = self.catalog.list_jobs(CatalogFilters(mine="all"))
                 write_outputs(
                     [item.job for item in stored],
                     statuses,

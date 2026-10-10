@@ -9,19 +9,35 @@ from urllib.parse import urlsplit
 import uvicorn
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
+from pydantic import BaseModel, ConfigDict, Field
 from starlette.datastructures import Headers, MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from jobsearch.constants import ENGLISH_LEVELS, SOURCE_NAMES
-from jobsearch.db.catalog import Catalog, CatalogFilters
+from jobsearch.db.catalog import (
+    CHANGE_CHOICES,
+    LANGUAGE_CHOICES,
+    MAX_RATING,
+    MINE_CHOICES,
+    Catalog,
+    CatalogFilters,
+)
 from jobsearch.log import configure_logging
 from jobsearch.service import CatalogService
-from jobsearch.web.report import render_catalog
+from jobsearch.web import i18n
+from jobsearch.web.pages import (
+    DEFAULT_PER_PAGE,
+    PER_PAGE_CHOICES,
+    CatalogView,
+    render_catalog,
+)
+from jobsearch.web.rows import render_rows
 
 log = logging.getLogger("jobsearch")
 
 _SOURCES = {"", *SOURCE_NAMES}
 _ENGLISH = {"", *ENGLISH_LEVELS}
+_LANGUAGE_COOKIE = "lang"
 _LOCAL_NAMES = {"localhost", "127.0.0.1", "::1"}
 # Tailscale and other carrier-grade NAT addresses are private to the tunnel, but Python
 # does not count 100.64.0.0/10 as private.
@@ -132,14 +148,74 @@ def create_app(
     @app.exception_handler(Exception)
     async def unhandled(request: Request, exc: Exception) -> HTMLResponse | JSONResponse:
         log.exception("request failed: %s", request.url.path)
-        if request.url.path.startswith("/api") or request.url.path == "/health":
+        path = request.url.path
+        if path.startswith(("/api", "/fragments")) or path == "/health":
             return JSONResponse({"ok": False, "detail": "internal error"}, status_code=500)
-        return HTMLResponse(_ERROR_PAGE, status_code=500, headers=_PAGE_HEADERS)
+        language, _explicit = _language(request)
+        return HTMLResponse(_error_page(language), status_code=500, headers=_PAGE_HEADERS)
 
     @app.get("/", response_class=HTMLResponse)
-    def home(request: Request, filters: CatalogFilters = Depends(read_filters)) -> HTMLResponse:
-        page = _page(catalog, service, filters, can_refresh(request))
-        return HTMLResponse(page, headers=_PAGE_HEADERS)
+    def home(
+        request: Request,
+        filters: CatalogFilters = Depends(read_filters),
+        paging: tuple[int, int] = Depends(read_paging),
+    ) -> HTMLResponse:
+        language, explicit = _language(request)
+        view = _view(catalog, service, filters, *paging)
+        view.can_refresh = can_refresh(request)
+        view.language = language
+        response = HTMLResponse(render_catalog(view), headers=_PAGE_HEADERS)
+        if explicit:
+            response.set_cookie(
+                _LANGUAGE_COOKIE, language, max_age=365 * 24 * 3600, samesite="lax", httponly=True
+            )
+        return response
+
+    @app.get("/fragments/rows", response_model=None)
+    def rows(
+        request: Request,
+        filters: CatalogFilters = Depends(read_filters),
+        paging: tuple[int, int] = Depends(read_paging),
+    ) -> JSONResponse:
+        """The next batch of table rows, for the "show more" button."""
+        language, _explicit = _language(request)
+        # A page past the end is empty, so a stale "show more" never repeats rows.
+        view = _view(catalog, service, filters, *paging, clamp=False)
+        t = i18n.translator(language)
+        left = view.total - view.page * view.per_page
+        return JSONResponse(
+            {
+                "html": render_rows(view.items, t, actions=True),
+                "last": view.last,
+                "total": view.total,
+                "next": view.page + 1 if left > 0 else None,
+                "more_label": t("show_more", n=min(view.per_page, left)) if left > 0 else "",
+            },
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @app.post("/api/jobs/state", response_model=None)
+    def set_state(request: Request, update: MarksUpdate):
+        """Mark a vacancy: favorite, not for me, viewed, or a rating from 1 to 5."""
+        if not _same_origin(request):
+            return JSONResponse({"detail": "only accepted from this site"}, status_code=403)
+        if not request.headers.get("content-type", "").startswith("application/json"):
+            return JSONResponse({"detail": "send application/json"}, status_code=415)
+        marks = catalog.set_marks(
+            update.url,
+            favorite=update.favorite,
+            hidden=update.hidden,
+            rating=update.rating,
+            viewed=update.viewed,
+        )
+        if marks is None:
+            return JSONResponse({"detail": "unknown vacancy"}, status_code=404)
+        return {
+            "favorite": marks.favorite,
+            "hidden": marks.hidden,
+            "rating": marks.rating,
+            "viewed": marks.viewed,
+        }
 
     @app.get("/health", response_model=None)
     @app.get("/api/status", response_model=None)
@@ -164,7 +240,18 @@ def create_app(
     def jobs(filters: CatalogFilters = Depends(read_filters)) -> list[dict]:
         return [
             item.job.as_dict()
-            | {"active": item.active, "first_seen": item.first_seen, "last_seen": item.last_seen}
+            | {
+                "active": item.active,
+                "first_seen": item.first_seen,
+                "last_seen": item.last_seen,
+                "change": item.change,
+                "changes": list(item.changes),
+                "language": item.language,
+                "favorite": item.marks.favorite,
+                "hidden": item.marks.hidden,
+                "rating": item.marks.rating,
+                "viewed": item.marks.viewed,
+            }
             for item in catalog.list_jobs(filters)
         ]
 
@@ -272,14 +359,39 @@ def _same_origin(request: Request) -> bool:
     return True
 
 
-_ERROR_PAGE = """<!DOCTYPE html>
-<html lang="uk">
+class MarksUpdate(BaseModel):
+    """A change to your own notes about one vacancy. Omitted fields stay as they are."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    url: str = Field(min_length=1, max_length=2000)
+    favorite: bool | None = None
+    hidden: bool | None = None
+    rating: int | None = Field(default=None, ge=0, le=MAX_RATING)
+    viewed: bool | None = None
+
+
+def _language(request: Request) -> tuple[str, bool]:
+    """The page language, and whether the visitor just picked it (so it should be saved)."""
+    chosen = request.query_params.get("lang", "")
+    language = i18n.pick_language(
+        chosen,
+        request.cookies.get(_LANGUAGE_COOKIE, ""),
+        request.headers.get("accept-language", ""),
+    )
+    return language, chosen in i18n.LANGUAGES
+
+
+def _error_page(language: str) -> str:
+    t = i18n.translator(language)
+    return f"""<!DOCTYPE html>
+<html lang="{language}">
 <head>
   <meta charset="utf-8">
-  <title>Каталог тимчасово недоступний</title>
+  <title>{t("error_title")}</title>
 </head>
 <body>
-  <p>Каталог тимчасово недоступний. Деталі є в журналі процесу.</p>
+  <p>{t("error_body")}</p>
 </body>
 </html>
 """
@@ -293,9 +405,14 @@ def read_filters(
     min_years: str = "",
     full_remote_only: str = "",
     include_inactive: str = "",
+    mine: str = "",
+    min_rating: str = "",
+    change: str = "",
+    language: str = "",
 ) -> CatalogFilters:
     level = english.strip().upper()
     chosen = source.strip()
+    rating = _int(min_rating)
     return CatalogFilters(
         text=q.strip()[:80],
         source=chosen if chosen in _SOURCES else "",
@@ -304,21 +421,46 @@ def read_filters(
         english=level if level in _ENGLISH else "",
         min_years=_float(min_years),
         include_inactive=include_inactive == "1",
+        mine=mine if mine in MINE_CHOICES else "",
+        min_rating=rating if rating is not None and 1 <= rating <= MAX_RATING else None,
+        change=change if change in CHANGE_CHOICES else "",
+        language=language if language in LANGUAGE_CHOICES else "",
     )
 
 
-def _page(
-    catalog: Catalog, service: CatalogService, filters: CatalogFilters, can_refresh: bool
-) -> str:
+def read_paging(page: str = "", per_page: str = "") -> tuple[int, int]:
+    size = _int(per_page)
+    number = _int(page)
+    return (
+        number if number is not None and number >= 1 else 1,
+        size if size in PER_PAGE_CHOICES else DEFAULT_PER_PAGE,
+    )
+
+
+def _view(
+    catalog: Catalog,
+    service: CatalogService,
+    filters: CatalogFilters,
+    page: int,
+    per_page: int,
+    *,
+    clamp: bool = True,
+) -> CatalogView:
     stored = catalog.list_jobs(filters)
+    if clamp:
+        page = min(page, max(1, -(-len(stored) // per_page)))
     active_count, inactive_count = catalog.counts()
     statuses, finished, added, updated, deactivated = catalog.latest_statuses()
-    return render_catalog(
-        stored,
-        statuses,
-        filters,
+    return CatalogView(
+        items=stored[(page - 1) * per_page : page * per_page],
+        total=len(stored),
+        page=page,
+        per_page=per_page,
+        filters=filters,
+        statuses=statuses,
         active_count=active_count,
         inactive_count=inactive_count,
+        new_count=sum(1 for item in stored if item.active and item.change == "added"),
         running=service.running,
         last_finished=finished,
         next_run=service.next_run,
@@ -326,7 +468,6 @@ def _page(
         updated=updated,
         deactivated=deactivated,
         error=service.last_error,
-        can_refresh=can_refresh,
     )
 
 

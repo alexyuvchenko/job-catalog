@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from jobsearch.db.catalog import Catalog, CatalogFilters
 from jobsearch.models import Job, SourceStatus
 from jobsearch.service import CatalogService
-from jobsearch.web.report import render_catalog
+from jobsearch.web.pages import CatalogView, render_catalog
 from jobsearch.web.server import create_app
 
 
@@ -66,18 +66,9 @@ class CatalogTests(unittest.TestCase):
 
     def test_catalog_page_lists_a_stored_job(self):
         page = render_catalog(
-            [],
-            [],
-            CatalogFilters(),
-            active_count=0,
-            inactive_count=0,
-            running=True,
-            last_finished="",
-            next_run="",
-            added=0,
-            updated=0,
-            deactivated=0,
-            error="",
+            CatalogView(
+                items=[], total=0, page=1, per_page=50, filters=CatalogFilters(), running=True
+            )
         )
         self.assertIn("Каталог ще порожній", page)
         self.assertIn('data-refreshing="1"', page)
