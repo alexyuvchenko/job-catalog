@@ -1,0 +1,398 @@
+from __future__ import annotations
+
+import sqlite3
+from contextlib import contextmanager
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+
+from jobsearch.classify import accept_remote, english_meets, salary_meets
+from jobsearch.db.sqlite import connect
+from jobsearch.models import Job, SourceStatus
+from jobsearch.paths import CATALOG_PATH
+
+
+@dataclass
+class CatalogFilters:
+    text: str = ""
+    source: str = ""
+    full_remote_only: bool = False
+    min_salary: int | None = None
+    english: str = ""
+    min_years: float | None = None
+    include_inactive: bool = False
+
+
+@dataclass
+class MergeStats:
+    added: int = 0
+    updated: int = 0
+    deactivated: int = 0
+
+
+@dataclass
+class StoredJob:
+    job: Job
+    active: bool
+    first_seen: str
+    last_seen: str
+
+
+class Catalog:
+    def __init__(self, path: Path = CATALOG_PATH) -> None:
+        self.path = path
+        self._schema_ready = False
+
+    def merge(
+        self,
+        jobs: list[Job],
+        statuses: list[SourceStatus],
+        started_at: str,
+        finished_at: str,
+    ) -> MergeStats:
+        stats = MergeStats()
+        with self._session() as connection:
+            for status in statuses:
+                if not status.ok:
+                    continue
+                incoming = [job for job in jobs if job.source == status.name]
+                if not incoming:
+                    continue
+                seen: set[str] = set()
+                for job in incoming:
+                    if job.url in seen:
+                        continue
+                    seen.add(job.url)
+                    if self._upsert(connection, job, finished_at):
+                        stats.added += 1
+                    else:
+                        stats.updated += 1
+                placeholders = ",".join("?" for _ in seen)
+                if status.complete:
+                    cursor = connection.execute(
+                        f"""
+                        UPDATE jobs
+                        SET active = 0
+                        WHERE source = ? AND active = 1 AND url NOT IN ({placeholders})
+                        """,
+                        (status.name, *seen),
+                    )
+                    stats.deactivated += cursor.rowcount
+            cursor = connection.execute(
+                """
+                INSERT INTO refreshes (started_at, finished_at, ok, added, updated, deactivated, error)
+                VALUES (?, ?, 1, ?, ?, ?, '')
+                """,
+                (started_at, finished_at, stats.added, stats.updated, stats.deactivated),
+            )
+            refresh_id = cursor.lastrowid
+            connection.executemany(
+                """
+                INSERT INTO source_runs (refresh_id, name, ok, message, fetched, kept, complete)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        refresh_id,
+                        status.name,
+                        int(status.ok),
+                        status.message,
+                        status.fetched,
+                        status.kept,
+                        int(status.complete),
+                    )
+                    for status in statuses
+                ],
+            )
+            connection.commit()
+        return stats
+
+    def record_failure(self, started_at: str, finished_at: str, error: str) -> None:
+        with self._session() as connection:
+            connection.execute(
+                """
+                INSERT INTO refreshes (started_at, finished_at, ok, error)
+                VALUES (?, ?, 0, ?)
+                """,
+                (started_at, finished_at, error[:500]),
+            )
+            connection.commit()
+
+    def list_jobs(self, filters: CatalogFilters) -> list[StoredJob]:
+        cutoff = self._new_cutoff()
+        found: list[StoredJob] = []
+        with self._session() as connection:
+            rows = connection.execute(
+                "SELECT * FROM jobs ORDER BY published DESC, salary_max DESC, title"
+            ).fetchall()
+        for row in rows:
+            stored = _stored(row, cutoff)
+            if _visible(stored, filters):
+                found.append(stored)
+        return found
+
+    def counts(self) -> tuple[int, int]:
+        with self._session() as connection:
+            active = connection.execute("SELECT COUNT(*) FROM jobs WHERE active = 1").fetchone()[0]
+            inactive = connection.execute("SELECT COUNT(*) FROM jobs WHERE active = 0").fetchone()[
+                0
+            ]
+        return active, inactive
+
+    def latest_statuses(self) -> tuple[list[SourceStatus], str, int, int, int]:
+        with self._session() as connection:
+            refresh = connection.execute(
+                """
+                SELECT id, finished_at, added, updated, deactivated
+                FROM refreshes
+                WHERE ok = 1 AND finished_at IS NOT NULL
+                ORDER BY id DESC
+                LIMIT 1
+                """
+            ).fetchone()
+            if refresh is None:
+                return [], "", 0, 0, 0
+            runs = connection.execute(
+                """
+                SELECT name, ok, message, fetched, kept, complete
+                FROM source_runs WHERE refresh_id = ? ORDER BY rowid
+                """,
+                (refresh["id"],),
+            ).fetchall()
+            finished_at = refresh["finished_at"]
+            added = refresh["added"]
+            updated = refresh["updated"]
+            deactivated = refresh["deactivated"]
+            run_rows = [
+                (
+                    run["name"],
+                    bool(run["ok"]),
+                    run["message"],
+                    run["fetched"],
+                    run["kept"],
+                    bool(run["complete"]),
+                )
+                for run in runs
+            ]
+        statuses = [
+            SourceStatus(
+                name=name, ok=ok, message=message, fetched=fetched, kept=kept, complete=complete
+            )
+            for name, ok, message, fetched, kept, complete in run_rows
+        ]
+        return statuses, finished_at, added, updated, deactivated
+
+    def _new_cutoff(self) -> str:
+        with self._session() as connection:
+            rows = connection.execute(
+                """
+                SELECT started_at FROM refreshes
+                WHERE ok = 1 AND finished_at IS NOT NULL
+                ORDER BY id DESC
+                LIMIT 2
+                """
+            ).fetchall()
+            if len(rows) < 2:
+                return ""
+            return rows[0]["started_at"]
+
+    def _upsert(self, connection: sqlite3.Connection, job: Job, seen_at: str) -> bool:
+        existing = connection.execute(
+            "SELECT first_seen FROM jobs WHERE url = ?", (job.url,)
+        ).fetchone()
+        if existing is None:
+            connection.execute(
+                """
+                INSERT INTO jobs (
+                    url, source, job_id, title, company, company_url, location, remote,
+                    salary_min, salary_max, currency, salary_text, category, english, years,
+                    published, reservation, evidence, snippet, active, first_seen, last_seen
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                """,
+                _values(job) + (seen_at, seen_at),
+            )
+            return True
+        connection.execute(
+            """
+            UPDATE jobs SET
+                source = ?, job_id = ?, title = ?, company = ?, company_url = ?, location = ?,
+                remote = ?, salary_min = ?, salary_max = ?, currency = ?, salary_text = ?,
+                category = ?, english = ?, years = ?, published = ?, reservation = ?,
+                evidence = ?, snippet = ?, active = 1, last_seen = ?
+            WHERE url = ?
+            """,
+            (
+                job.source,
+                job.job_id,
+                job.title,
+                job.company,
+                job.company_url,
+                job.location,
+                job.remote,
+                job.salary_min,
+                job.salary_max,
+                job.currency,
+                job.salary_text,
+                job.category,
+                job.english,
+                job.years,
+                job.published,
+                job.reservation,
+                job.evidence,
+                job.snippet,
+                seen_at,
+                job.url,
+            ),
+        )
+        return False
+
+    @contextmanager
+    def _session(self):
+        connection = self._connect()
+        try:
+            yield connection
+            connection.commit()
+        finally:
+            connection.close()
+
+    def _connect(self) -> sqlite3.Connection:
+        connection = connect(self.path)
+        if self._schema_ready:
+            return connection
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS jobs (
+                url TEXT PRIMARY KEY,
+                source TEXT NOT NULL,
+                job_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                company TEXT NOT NULL,
+                company_url TEXT NOT NULL,
+                location TEXT NOT NULL,
+                remote TEXT NOT NULL,
+                salary_min INTEGER,
+                salary_max INTEGER,
+                currency TEXT,
+                salary_text TEXT NOT NULL,
+                category TEXT NOT NULL,
+                english TEXT NOT NULL,
+                years REAL,
+                published TEXT NOT NULL,
+                reservation TEXT NOT NULL,
+                evidence TEXT NOT NULL,
+                snippet TEXT NOT NULL,
+                active INTEGER NOT NULL,
+                first_seen TEXT NOT NULL,
+                last_seen TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS refreshes (
+                id INTEGER PRIMARY KEY,
+                started_at TEXT NOT NULL,
+                finished_at TEXT,
+                ok INTEGER NOT NULL DEFAULT 0,
+                added INTEGER NOT NULL DEFAULT 0,
+                updated INTEGER NOT NULL DEFAULT 0,
+                deactivated INTEGER NOT NULL DEFAULT 0,
+                error TEXT NOT NULL DEFAULT ''
+            );
+            CREATE TABLE IF NOT EXISTS source_runs (
+                refresh_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                ok INTEGER NOT NULL,
+                message TEXT NOT NULL,
+                fetched INTEGER NOT NULL,
+                kept INTEGER NOT NULL,
+                complete INTEGER NOT NULL DEFAULT 1
+            );
+            CREATE INDEX IF NOT EXISTS jobs_source_active ON jobs(source, active);
+            CREATE INDEX IF NOT EXISTS jobs_published ON jobs(published);
+            """
+        )
+        columns = {row["name"] for row in connection.execute("PRAGMA table_info(source_runs)")}
+        if "complete" not in columns:
+            connection.execute(
+                "ALTER TABLE source_runs ADD COLUMN complete INTEGER NOT NULL DEFAULT 1"
+            )
+            connection.execute(
+                "UPDATE source_runs SET complete = 0 WHERE message LIKE '%не знімаються%'"
+            )
+        self._schema_ready = True
+        return connection
+
+
+def _values(job: Job) -> tuple:
+    return (
+        job.url,
+        job.source,
+        job.job_id,
+        job.title,
+        job.company,
+        job.company_url,
+        job.location,
+        job.remote,
+        job.salary_min,
+        job.salary_max,
+        job.currency,
+        job.salary_text,
+        job.category,
+        job.english,
+        job.years,
+        job.published,
+        job.reservation,
+        job.evidence,
+        job.snippet,
+    )
+
+
+def _stored(row: sqlite3.Row, new_cutoff: str) -> StoredJob:
+    first_seen = row["first_seen"]
+    job = Job(
+        source=row["source"],
+        job_id=row["job_id"],
+        title=row["title"],
+        company=row["company"],
+        company_url=row["company_url"],
+        url=row["url"],
+        location=row["location"],
+        remote=row["remote"],
+        salary_min=row["salary_min"],
+        salary_max=row["salary_max"],
+        currency=row["currency"],
+        salary_text=row["salary_text"],
+        category=row["category"],
+        english=row["english"],
+        years=row["years"],
+        published=row["published"],
+        reservation=row["reservation"],
+        evidence=row["evidence"],
+        snippet=row["snippet"],
+        is_new=bool(new_cutoff) and first_seen >= new_cutoff,
+    )
+    return StoredJob(
+        job=job, active=bool(row["active"]), first_seen=first_seen, last_seen=row["last_seen"]
+    )
+
+
+def _visible(stored: StoredJob, filters: CatalogFilters) -> bool:
+    if not filters.include_inactive and not stored.active:
+        return False
+    job = stored.job
+    if filters.source and job.source != filters.source:
+        return False
+    if filters.text:
+        blob = " ".join((job.title, job.company, job.location, job.snippet, job.category)).lower()
+        if filters.text.lower() not in blob:
+            return False
+    if not accept_remote(job.remote, filters.full_remote_only):
+        return False
+    if not salary_meets(job, filters.min_salary):
+        return False
+    if not english_meets(job.english, filters.english):
+        return False
+    if filters.min_years is not None and job.years is not None and job.years < filters.min_years:
+        return False
+    return True
+
+
+def now_stamp() -> str:
+    return datetime.now().replace(microsecond=0).isoformat(sep=" ")
