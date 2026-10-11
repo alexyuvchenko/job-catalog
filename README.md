@@ -33,11 +33,11 @@ That creates `.venv` from `uv.lock`, installs this package, and installs Ruff fo
 ## Search once
 
 ```bash
-uv run job-search --keyword python --pages 2
-uv run job-search --keyword "qa" --full-remote-only --min-salary 2000 --english B1
-uv run job-search --focus all --pages 4
-uv run job-search --keyword python --json
-uv run job-search --keyword python --pages 2 --open
+uv run job-catalog --keyword python --pages 2
+uv run job-catalog --keyword "qa" --full-remote-only --min-salary 2000 --english B1
+uv run job-catalog --focus all --pages 4
+uv run job-catalog --keyword python --json
+uv run job-catalog --keyword python --pages 2 --open
 ```
 
 | Flag | Meaning |
@@ -68,8 +68,8 @@ The local service keeps the remote engineering list and refreshes it on its own.
 - if a site fails, or only some of its pages load, the vacancies it already had stay, and the ones it returned are still added or updated
 
 ```bash
-uv run job-search --serve
-uv run job-search --serve --interval 3 --port 8765
+uv run job-catalog --serve
+uv run job-catalog --serve --interval 3 --port 8765
 ```
 
 Open http://127.0.0.1:8765 . The page is a FastAPI app that listens on this computer only unless you pass `--host`. The first refresh starts immediately, and Chrome opens off-screen for Work.ua and Robota.ua. Later refreshes run every 6 hours. Leave the process running. Logs go to the terminal.
@@ -144,7 +144,7 @@ The date, job, and company headings sort the list. Date starts with the newest v
 Start the service so it listens on the network, and keep the computer awake and on the same Wi-Fi as the phone:
 
 ```bash
-uv run job-search --serve --host 0.0.0.0
+uv run job-catalog --serve --host 0.0.0.0
 ```
 
 The log prints the address to use, for example `http://192.168.1.20:8765`. You can also find it with `ipconfig getifaddr en0` on macOS. Open that address on the phone. macOS may ask once to allow incoming connections.
@@ -158,12 +158,12 @@ The log prints the address to use, for example `http://192.168.1.20:8765`. You c
 
 ### Publish on the internet
 
-The process should still listen on this computer. Put HTTPS in front of it (a reverse proxy or a tunnel). Do not forward port 8765 on the router: Cactus often has no public IPv4, and a raw port has no TLS.
+The process should still listen on this computer. Put HTTPS in front of it (a reverse proxy or a tunnel). Do not forward port 8765 on the router: many home connections have no public IPv4, and a raw port has no TLS.
 
 Anyone who can open the public address can create an account and read the shared catalog. Pass `--no-register` if you want only accounts created on this computer.
 
 ```bash
-uv run job-search --serve --public-host catalog.example.com
+uv run job-catalog --serve --public-host catalog.example.com
 ```
 
 Point the proxy or tunnel at `http://127.0.0.1:8765` and use that DNS name. A temporary Cloudflare tunnel is:
@@ -207,9 +207,13 @@ The code is in `src/` (an application, not a library), with tests in `tests/`.
 - `web/frontend` — pages, rows, components, the Ukrainian and English text (`i18n.py`), the saved report (`report.py`), and `assets/` (CSS and JavaScript)
 - `cli.py` — the command
 
-`uv run job-search` is the command. `uv run python -m cli` does the same thing.
+`uv run job-catalog` is the command. `uv run python -m cli` does the same thing.
 
 `data/` and `out/` are created next to `pyproject.toml`, so run the app from a checkout of this repository.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
 
 ## Development
 

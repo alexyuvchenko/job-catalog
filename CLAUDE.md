@@ -6,8 +6,8 @@ Personal tool that collects remote IT vacancies in Ukraine where the employer st
 
 ```bash
 uv sync                                          # install
-uv run job-search --serve                        # catalog service on 127.0.0.1:8765
-uv run job-search --keyword python               # one-off search, writes out/
+uv run job-catalog --serve                       # catalog service on 127.0.0.1:8765
+uv run job-catalog --keyword python              # one-off search, writes out/
 uv run ruff check --fix . && uv run ruff format .
 uv run pytest                                 # all tests
 uv run pytest tests/test_marks.py                # one module
@@ -24,7 +24,7 @@ Run ruff and the tests after every substantive change. Live fetches, Chrome, and
 - `jobs/` — `refresh.py` (refresh loop, `CatalogService`) and `search.py` (one-off search).
 - `web/` — `app.py` builds the FastAPI app and mounts routers. `security.py`: allowed hosts and response headers. `language.py`: page language and cookie. `auth/`: accounts and sign-in routes. `catalog/`: list, marks, and refresh routes.
 - `web/frontend/` — `pages.py`, `catalog_rows.py`, `components.py`, `account_page.py`, `report.py` (saved report), `i18n.py` (Ukrainian and English text), and `assets/styles.py`, `assets/script.py`.
-- `cli.py` — entry point (`job-search` script, or `python -m cli`).
+- `cli.py` — entry point (`job-catalog` script, or `python -m cli`).
 
 `data/` (catalog and cache DBs) and `out/` are local state next to `pyproject.toml`. Do not commit them.
 

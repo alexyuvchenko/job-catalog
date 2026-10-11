@@ -160,7 +160,7 @@ wheels = [
 ]
 
 [[package]]
-name = "job-search"
+name = "job-catalog"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [

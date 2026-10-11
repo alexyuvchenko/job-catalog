@@ -7,4 +7,5 @@ dist/
 .ruff_cache/
 data/
 out/
+docs/
 .DS_Store
