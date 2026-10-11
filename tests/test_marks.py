@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from tests.support import sign_in
 
 from jobsearch.classify import detect_language
 from jobsearch.db.catalog import Catalog, CatalogFilters
@@ -39,6 +40,9 @@ class TextTests(unittest.TestCase):
         self.assertEqual(i18n.pick_language("", "", "en-US,en;q=0.9"), "en")
         self.assertEqual(i18n.pick_language("", "", "uk-UA,uk;q=0.9,en;q=0.5"), "uk")
         self.assertEqual(i18n.pick_language("xx", "yy", ""), "uk")
+        self.assertEqual(i18n.pick_language("", "", "en", "uk"), "uk")
+        self.assertEqual(i18n.pick_language("", "en", "", "uk"), "en")
+        self.assertEqual(i18n.pick_language("uk", "en", "en", "en"), "uk")
 
     def test_description_language(self):
         self.assertEqual(detect_language(ENGLISH_TEXT), "en")
@@ -51,17 +55,18 @@ class MarksTests(unittest.TestCase):
     def test_marks_filter_and_survive_a_refresh(self):
         with tempfile.TemporaryDirectory() as folder:
             catalog = _catalog(folder, [_job("1"), _job("2"), _job("3")])
-            self.assertIsNone(catalog.set_marks("https://example.com/missing", favorite=True))
+            user = catalog.create_user("ada", "password-1").id
+            self.assertIsNone(catalog.set_marks("https://example.com/missing", user, favorite=True))
             with self.assertRaises(ValueError):
-                catalog.set_marks("https://example.com/1", rating=6)
+                catalog.set_marks("https://example.com/1", user, rating=6)
 
-            catalog.set_marks("https://example.com/1", favorite=True, rating=4)
-            catalog.set_marks("https://example.com/2", hidden=True)
-            catalog.set_marks("https://example.com/3", viewed=True)
+            catalog.set_marks("https://example.com/1", user, favorite=True, rating=4)
+            catalog.set_marks("https://example.com/2", user, hidden=True)
+            catalog.set_marks("https://example.com/3", user, viewed=True)
 
             def urls(**filters):
                 return sorted(
-                    item.job.url[-1] for item in catalog.list_jobs(CatalogFilters(**filters))
+                    item.job.url[-1] for item in catalog.list_jobs(CatalogFilters(**filters), user)
                 )
 
             self.assertEqual(urls(), ["1", "3"])  # "not for me" is hidden by default
@@ -75,13 +80,13 @@ class MarksTests(unittest.TestCase):
             self.assertEqual(urls(min_rating=4), ["1"])
 
             # Favorite and "not for me" exclude each other, and viewing keeps the first time.
-            marks = catalog.set_marks("https://example.com/1", hidden=True)
+            marks = catalog.set_marks("https://example.com/1", user, hidden=True)
             self.assertTrue(marks.hidden and not marks.favorite)
-            first = catalog.set_marks("https://example.com/3", viewed=True).viewed_at
+            first = catalog.set_marks("https://example.com/3", user, viewed=True).viewed_at
             self.assertEqual(
-                catalog.set_marks("https://example.com/3", viewed=True).viewed_at, first
+                catalog.set_marks("https://example.com/3", user, viewed=True).viewed_at, first
             )
-            self.assertFalse(catalog.set_marks("https://example.com/3", viewed=False).viewed)
+            self.assertFalse(catalog.set_marks("https://example.com/3", user, viewed=False).viewed)
 
             # A new refresh must not wipe the notes.
             catalog.merge(
@@ -93,7 +98,7 @@ class MarksTests(unittest.TestCase):
             self.assertTrue(
                 next(
                     item
-                    for item in catalog.list_jobs(CatalogFilters(mine="all"))
+                    for item in catalog.list_jobs(CatalogFilters(mine="all"), user)
                     if item.job.url.endswith("/2")
                 ).marks.hidden
             )
@@ -101,23 +106,24 @@ class MarksTests(unittest.TestCase):
     def test_quick_changes_to_one_vacancy_do_not_overwrite_each_other(self):
         with tempfile.TemporaryDirectory() as folder:
             catalog = _catalog(folder, [_job("1")])
+            user = catalog.create_user("ada", "password-1").id
             url = "https://example.com/1"
             for _ in range(15):
-                catalog.set_marks(url, favorite=False, rating=0, viewed=False)
+                catalog.set_marks(url, user, favorite=False, rating=0, viewed=False)
                 changes = [
                     {"favorite": True},
                     {"rating": 4},
                     {"viewed": True},
                 ]
                 threads = [
-                    threading.Thread(target=lambda c=change: catalog.set_marks(url, **c))
+                    threading.Thread(target=lambda c=change: catalog.set_marks(url, user, **c))
                     for change in changes
                 ]
                 for thread in threads:
                     thread.start()
                 for thread in threads:
                     thread.join()
-                marks = catalog.list_jobs(CatalogFilters())[0].marks
+                marks = catalog.list_jobs(CatalogFilters(), user)[0].marks
                 self.assertTrue(marks.favorite and marks.viewed and marks.rating == 4)
 
     def test_added_changed_and_closed_are_told_apart(self):
@@ -189,6 +195,7 @@ class WebTests(unittest.TestCase):
             base_url="http://127.0.0.1",
             raise_server_exceptions=False,
         )
+        sign_in(self.client, self.catalog)
 
     def test_state_api(self):
         url = "https://example.com/1"
@@ -253,14 +260,14 @@ class WebTests(unittest.TestCase):
         # The cookie carries the choice to the next page, and to the "show more" rows.
         self.assertIn('<html lang="en">', self.client.get("/").text)
         self.assertIn("My rating", self.client.get("/fragments/rows").json()["html"])
+        other = TestClient(
+            create_app(self.catalog, CatalogService(self.catalog), start_scheduler=False),
+            base_url="http://127.0.0.1",
+        )
+        sign_in(other, self.catalog, "ben", "password-2")
         self.assertIn(
             '<html lang="en">',
-            TestClient(
-                create_app(self.catalog, CatalogService(self.catalog), start_scheduler=False),
-                base_url="http://127.0.0.1",
-            )
-            .get("/", headers={"Accept-Language": "en-GB,en;q=0.8"})
-            .text,
+            other.get("/", headers={"Accept-Language": "en-GB,en;q=0.8"}).text,
         )
 
     def test_filter_form_keeps_its_values(self):
@@ -302,8 +309,9 @@ class RenderTests(unittest.TestCase):
                 "2026-10-11 10:00:00",
                 "2026-10-11 10:01:00",
             )
-            catalog.set_marks("https://example.com/3", viewed=True, favorite=True, rating=2)
-            items = catalog.list_jobs(CatalogFilters(include_inactive=True))
+            user = catalog.create_user("ada", "password-1").id
+            catalog.set_marks("https://example.com/3", user, viewed=True, favorite=True, rating=2)
+            items = catalog.list_jobs(CatalogFilters(include_inactive=True), user)
             view = CatalogView(
                 items=items, total=len(items), page=1, per_page=50, filters=CatalogFilters()
             )

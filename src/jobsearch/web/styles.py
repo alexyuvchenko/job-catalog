@@ -29,7 +29,19 @@ CSS = """
       font: 16px/1.45 "Segoe UI", "Helvetica Neue", Arial, sans-serif;
     }
     main { max-width: 1100px; margin: 0 auto; padding: 28px 20px 64px; }
-    .topbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .topbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+    .who { display: flex; align-items: center; gap: 10px; flex: none; margin-left: auto; }
+    .account { display: flex; align-items: center; gap: 8px; }
+    .account .name {
+      font-size: 0.9rem; color: var(--muted); max-width: 12rem;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .account button.secondary { padding: 4px 10px; }
+    .auth { max-width: 28rem; }
+    .auth label { margin-bottom: 12px; }
+    .auth input { width: 100%; }
+    .auth .switch { margin: 16px 0 0; }
+    :focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
     h1 { font-size: 1.7rem; line-height: 1.2; margin: 0 0 8px; }
     .langs { display: flex; gap: 2px; flex: none; font-size: 0.85rem; }
     .langs a {
@@ -233,6 +245,9 @@ CSS = """
         padding: 16px max(12px, env(safe-area-inset-right)) 48px max(12px, env(safe-area-inset-left));
       }
       h1 { font-size: 1.35rem; }
+      .topbar { flex-direction: column; align-items: stretch; }
+      .who { margin-left: 0; justify-content: space-between; }
+      .account .name { max-width: 9rem; }
       .lede { font-size: 0.95rem; margin-bottom: 14px; }
       .panel { padding: 12px; border-radius: 10px; }
       .grid { grid-template-columns: 1fr; gap: 10px; }

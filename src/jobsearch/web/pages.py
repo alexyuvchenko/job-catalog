@@ -59,6 +59,7 @@ class CatalogView:
     error: str = ""
     can_refresh: bool = True
     language: str = "uk"
+    username: str = ""
 
     @property
     def pages(self) -> int:
@@ -129,7 +130,7 @@ def render_catalog(view: CatalogView) -> str:
 <main>
   <div class="topbar">
     <h1>{escape(t("title"))}</h1>
-    {_language_switch(view, t)}
+    <div class="who">{_language_switch(view, t)}{_account(view, t)}</div>
   </div>
   <p class="lede">{escape(t("lede_catalog"))}</p>
   {"".join(notices)}
@@ -202,9 +203,9 @@ def _statusline(view: CatalogView, t: Translator) -> str:
         progress = escape(t("never_refreshed"))
     else:
         stats = [
-            _stat(t("stat_added", n=view.added), view.added, "added"),
-            _stat(t("stat_changed", n=view.updated), view.updated, "changed"),
-            _stat(t("stat_closed", n=view.deactivated), view.deactivated, "closed"),
+            _stat(view, t("stat_added", n=view.added), view.added, "added"),
+            _stat(view, t("stat_changed", n=view.updated), view.updated, "changed"),
+            _stat(view, t("stat_closed", n=view.deactivated), view.deactivated, "closed"),
         ]
         progress = f"{escape(t('refreshed_at', when=view.last_finished))} {', '.join(stats)}."
         if view.next_run and not view.running:
@@ -213,10 +214,28 @@ def _statusline(view: CatalogView, t: Translator) -> str:
     return f"{progress} {escape(t('in_catalog', active=view.active_count, closed=closed))}"
 
 
-def _stat(text: str, count: int, change: str) -> str:
+def _stat(view: CatalogView, text: str, count: int, change: str) -> str:
     if not count:
         return escape(text)
-    return f'<a class="stat" href="/?change={change}">{escape(text)}</a>'
+    params = [
+        (name, value)
+        for name, value in filter_params(view.filters, view.per_page)
+        if name != "change"
+    ]
+    params.append(("change", change))
+    return f'<a class="stat" href="/?{escape(urlencode(params))}">{escape(text)}</a>'
+
+
+def _account(view: CatalogView, t: Translator) -> str:
+    if not view.username:
+        return ""
+    return (
+        f'<div class="account" aria-label="{escape(t("account_label"))}">'
+        f'<span class="name">{escape(view.username)}</span>'
+        f'<form class="bare" action="/logout" method="post">'
+        f'<button class="secondary" type="submit">{escape(t("sign_out"))}</button>'
+        f"</form></div>"
+    )
 
 
 def _language_switch(view: CatalogView, t: Translator) -> str:
@@ -344,7 +363,7 @@ def _form(view: CatalogView, t: Translator) -> str:
   </form>
   <div class="actions">
     <button type="submit" form="filters">{escape(t("apply"))}</button>
-    <a class="button secondary" href="/">{escape(t("reset"))}</a>
+    <a class="button secondary" href="/?reset=1">{escape(t("reset"))}</a>
     <form class="bare" action="/refresh" method="post">
       <button class="secondary" type="submit"{disabled}>{escape(button)}</button>
     </form>

@@ -1,18 +1,21 @@
 from __future__ import annotations
 
+import asyncio
 import ipaddress
+import json
 import logging
 import socket
 from contextlib import asynccontextmanager
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, quote, urlencode, urlsplit
 
 import uvicorn
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.datastructures import Headers, MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from jobsearch.auth import SESSION_COOKIE, SESSION_DAYS, AccountError, User, safe_next
 from jobsearch.constants import ENGLISH_LEVELS, SOURCE_NAMES
 from jobsearch.db.catalog import (
     CHANGE_CHOICES,
@@ -26,10 +29,12 @@ from jobsearch.db.catalog import (
 from jobsearch.log import configure_logging
 from jobsearch.service import CatalogService
 from jobsearch.web import i18n
+from jobsearch.web.account import render_auth
 from jobsearch.web.pages import (
     DEFAULT_PER_PAGE,
     PER_PAGE_CHOICES,
     CatalogView,
+    filter_params,
     render_catalog,
 )
 from jobsearch.web.rows import render_rows
@@ -39,6 +44,25 @@ log = logging.getLogger("jobsearch")
 _SOURCES = {"", *SOURCE_NAMES}
 _ENGLISH = {"", *ENGLISH_LEVELS}
 _LANGUAGE_COOKIE = "lang"
+_MAX_FORM = 10_000
+_FILTER_KEYS = frozenset(
+    {
+        "q",
+        "source",
+        "mine",
+        "min_rating",
+        "change",
+        "language",
+        "min_salary",
+        "english",
+        "min_years",
+        "full_remote_only",
+        "include_inactive",
+        "per_page",
+        "sort",
+        "dir",
+    }
+)
 _LOCAL_NAMES = {"localhost", "127.0.0.1", "::1"}
 # Tailscale and other carrier-grade NAT addresses are private to the tunnel, but Python
 # does not count 100.64.0.0/10 as private.
@@ -155,33 +179,119 @@ def create_app(
         language, _explicit = _language(request)
         return HTMLResponse(_error_page(language), status_code=500, headers=_PAGE_HEADERS)
 
-    @app.get("/", response_class=HTMLResponse)
-    def home(
-        request: Request,
-        filters: CatalogFilters = Depends(read_filters),
-        paging: tuple[int, int] = Depends(read_paging),
-    ) -> HTMLResponse:
+    @app.get("/login", response_class=HTMLResponse, response_model=None)
+    def login_form(request: Request, next: str = ""):
+        if _signed_in(catalog, request) is not None:
+            return RedirectResponse(safe_next(next), status_code=303)
         language, explicit = _language(request)
-        view = _view(catalog, service, filters, *paging)
+        return _auth_page(language, explicit, "login", next_path=safe_next(next))
+
+    @app.post("/login", response_model=None)
+    async def login_submit(request: Request):
+        if not _same_origin(request):
+            return JSONResponse({"detail": "only accepted from this site"}, status_code=403)
+        language, explicit = _language(request)
+        fields = await _form_body(request)
+        if fields is None:
+            return PlainTextResponse("send application/x-www-form-urlencoded", status_code=415)
+        username = fields.get("username", "")
+        nxt = safe_next(fields.get("next", ""))
+        user = await asyncio.to_thread(catalog.authenticate, username, fields.get("password", ""))
+        if user is None:
+            return _auth_page(
+                language,
+                explicit,
+                "login",
+                error="auth_failed",
+                username=username.strip()[:64],
+                next_path=nxt,
+            )
+        return await _start_session(request, catalog, user, nxt, language, explicit)
+
+    @app.get("/register", response_class=HTMLResponse)
+    def register_form(request: Request) -> HTMLResponse:
+        language, explicit = _language(request)
+        return _auth_page(language, explicit, "register")
+
+    @app.post("/register", response_model=None)
+    async def register_submit(request: Request):
+        if not _same_origin(request):
+            return JSONResponse({"detail": "only accepted from this site"}, status_code=403)
+        language, explicit = _language(request)
+        fields = await _form_body(request)
+        if fields is None:
+            return PlainTextResponse("send application/x-www-form-urlencoded", status_code=415)
+        username = fields.get("username", "")
+        password = fields.get("password", "")
+        shown = username.strip()[:64]
+        if password != fields.get("password2", ""):
+            return _auth_page(
+                language, explicit, "register", error="password_mismatch", username=shown
+            )
+        try:
+            user = await asyncio.to_thread(catalog.create_user, username, password)
+        except AccountError as exc:
+            return _auth_page(language, explicit, "register", error=exc.code, username=shown)
+        return await _start_session(request, catalog, user, "/", language, explicit)
+
+    @app.post("/logout", response_model=None)
+    async def logout(request: Request):
+        if not _same_origin(request):
+            return JSONResponse({"detail": "only accepted from this site"}, status_code=403)
+        token = request.cookies.get(SESSION_COOKIE, "")
+        if token:
+            await asyncio.to_thread(catalog.close_session, token)
+        response = RedirectResponse("/login", status_code=303)
+        response.headers["Cache-Control"] = "no-store"
+        _clear_session(response)
+        return response
+
+    @app.get("/", response_class=HTMLResponse, response_model=None)
+    def home(request: Request):
+        user = _signed_in(catalog, request)
+        if user is None:
+            return _ask_sign_in(request)
+        saved_lang = catalog.saved_language(user.id)
+        language, explicit = _language(request, saved_lang)
+        if request.query_params.get("reset") == "1":
+            catalog.save_filters(user.id, "")
+            response = RedirectResponse("/", status_code=303)
+            response.headers["Cache-Control"] = "no-store"
+            _stick_language(response, request, catalog, user, language, explicit)
+            return response
+        params = request.query_params
+        page, query_per_page = read_paging(params.get("page", ""), params.get("per_page", ""))
+        if _FILTER_KEYS & set(params):
+            filters = _filters_from(params)
+            per_page = query_per_page
+            catalog.save_filters(user.id, encode_view(filters, per_page))
+        else:
+            filters, per_page = decode_view(catalog.saved_filters(user.id))
+            page, _query_size = read_paging(params.get("page", ""), "")
+            target = _catalog_location(filters, per_page, page, language if explicit else "")
+            if target != _current_location(request) and filter_params(filters, per_page):
+                response = RedirectResponse(target, status_code=303)
+                response.headers["Cache-Control"] = "no-store"
+                _stick_language(response, request, catalog, user, language, explicit)
+                return response
+        view = _view(catalog, service, filters, page, per_page, user_id=user.id)
         view.can_refresh = can_refresh(request)
         view.language = language
+        view.username = user.username
         response = HTMLResponse(render_catalog(view), headers=_PAGE_HEADERS)
-        if explicit:
-            response.set_cookie(
-                _LANGUAGE_COOKIE, language, max_age=365 * 24 * 3600, samesite="lax", httponly=True
-            )
+        _stick_language(response, request, catalog, user, language, explicit)
         return response
 
     @app.get("/fragments/rows", response_model=None)
-    def rows(
-        request: Request,
-        filters: CatalogFilters = Depends(read_filters),
-        paging: tuple[int, int] = Depends(read_paging),
-    ) -> JSONResponse:
+    def rows(request: Request) -> JSONResponse:
         """The next batch of table rows, for the "show more" button."""
-        language, _explicit = _language(request)
+        user = _signed_in(catalog, request)
+        if user is None:
+            return JSONResponse({"detail": "sign in"}, status_code=401)
+        language, _explicit = _language(request, catalog.saved_language(user.id))
+        filters, page, per_page = _bound_view(request, catalog, user)
         # A page past the end is empty, so a stale "show more" never repeats rows.
-        view = _view(catalog, service, filters, *paging, clamp=False)
+        view = _view(catalog, service, filters, page, per_page, user_id=user.id, clamp=False)
         t = i18n.translator(language)
         left = view.total - view.page * view.per_page
         return JSONResponse(
@@ -198,12 +308,16 @@ def create_app(
     @app.post("/api/jobs/state", response_model=None)
     def set_state(request: Request, update: MarksUpdate):
         """Mark a vacancy: favorite, not for me, viewed, or a rating from 1 to 5."""
+        user = _signed_in(catalog, request)
+        if user is None:
+            return JSONResponse({"detail": "sign in"}, status_code=401)
         if not _same_origin(request):
             return JSONResponse({"detail": "only accepted from this site"}, status_code=403)
         if not request.headers.get("content-type", "").startswith("application/json"):
             return JSONResponse({"detail": "send application/json"}, status_code=415)
         marks = catalog.set_marks(
             update.url,
+            user.id,
             favorite=update.favorite,
             hidden=update.hidden,
             rating=update.rating,
@@ -237,8 +351,12 @@ def create_app(
             "last_error": service.last_error,
         }
 
-    @app.get("/api/jobs")
-    def jobs(filters: CatalogFilters = Depends(read_filters)) -> list[dict]:
+    @app.get("/api/jobs", response_model=None)
+    def jobs(request: Request):
+        user = _signed_in(catalog, request)
+        if user is None:
+            return JSONResponse({"detail": "sign in"}, status_code=401)
+        filters, _page, _per_page = _bound_view(request, catalog, user)
         return [
             item.job.as_dict()
             | {
@@ -253,7 +371,7 @@ def create_app(
                 "rating": item.marks.rating,
                 "viewed": item.marks.viewed,
             }
-            for item in catalog.list_jobs(filters)
+            for item in catalog.list_jobs(filters, user.id)
         ]
 
     @app.post("/refresh", status_code=303, response_model=None)
@@ -262,6 +380,8 @@ def create_app(
             return JSONResponse(
                 {"detail": "refresh is only accepted from this site"}, status_code=403
             )
+        if _signed_in(catalog, request) is None:
+            return _ask_sign_in(request)
         if not can_refresh(request):
             return JSONResponse(
                 {"detail": "refresh can only be started on the computer that runs the service"},
@@ -372,15 +492,183 @@ class MarksUpdate(BaseModel):
     viewed: bool | None = None
 
 
-def _language(request: Request) -> tuple[str, bool]:
+def _language(request: Request, saved: str = "") -> tuple[str, bool]:
     """The page language, and whether the visitor just picked it (so it should be saved)."""
     chosen = request.query_params.get("lang", "")
     language = i18n.pick_language(
         chosen,
         request.cookies.get(_LANGUAGE_COOKIE, ""),
         request.headers.get("accept-language", ""),
+        saved,
     )
     return language, chosen in i18n.LANGUAGES
+
+
+def _set_lang_cookie(response: HTMLResponse | RedirectResponse, language: str) -> None:
+    response.set_cookie(
+        _LANGUAGE_COOKIE, language, max_age=365 * 24 * 3600, samesite="lax", httponly=True
+    )
+
+
+def _stick_language(
+    response: HTMLResponse | RedirectResponse,
+    request: Request,
+    catalog: Catalog,
+    user: User,
+    language: str,
+    explicit: bool,
+) -> None:
+    if explicit:
+        catalog.save_language(user.id, language)
+        _set_lang_cookie(response, language)
+        return
+    cookie = request.cookies.get(_LANGUAGE_COOKIE, "")
+    if language in i18n.LANGUAGES and cookie not in i18n.LANGUAGES:
+        if catalog.saved_language(user.id) == language:
+            _set_lang_cookie(response, language)
+
+
+def _set_session(response: RedirectResponse, token: str) -> None:
+    response.set_cookie(
+        SESSION_COOKIE,
+        token,
+        max_age=SESSION_DAYS * 24 * 3600,
+        httponly=True,
+        samesite="lax",
+        path="/",
+    )
+
+
+def _clear_session(response: RedirectResponse) -> None:
+    response.delete_cookie(SESSION_COOKIE, path="/", samesite="lax")
+
+
+def _signed_in(catalog: Catalog, request: Request) -> User | None:
+    token = request.cookies.get(SESSION_COOKIE, "")
+    if not token:
+        return None
+    return catalog.user_for_session(token)
+
+
+def _ask_sign_in(request: Request) -> RedirectResponse | JSONResponse:
+    if request.url.path.startswith(("/api", "/fragments")):
+        return JSONResponse({"detail": "sign in"}, status_code=401)
+    nxt = request.url.path
+    if request.url.query:
+        nxt += "?" + request.url.query
+    return RedirectResponse("/login?next=" + quote(safe_next(nxt), safe=""), status_code=303)
+
+
+def _auth_page(language: str, explicit: bool, mode: str, **kwargs: str) -> HTMLResponse:
+    response = HTMLResponse(render_auth(language, mode, **kwargs), headers=_PAGE_HEADERS)
+    if explicit:
+        _set_lang_cookie(response, language)
+    return response
+
+
+async def _form_body(request: Request) -> dict[str, str] | None:
+    content_type = request.headers.get("content-type", "")
+    if not content_type.startswith("application/x-www-form-urlencoded"):
+        return None
+    raw = await request.body()
+    if len(raw) > _MAX_FORM:
+        return None
+    parsed = parse_qs(raw.decode(errors="replace"), keep_blank_values=True, max_num_fields=12)
+    return {key: values[0] if values else "" for key, values in parsed.items()}
+
+
+async def _start_session(
+    request: Request,
+    catalog: Catalog,
+    user: User,
+    nxt: str,
+    language: str,
+    explicit: bool,
+) -> RedirectResponse:
+    old = request.cookies.get(SESSION_COOKIE, "")
+    if old:
+        await asyncio.to_thread(catalog.close_session, old)
+    token = await asyncio.to_thread(catalog.open_session, user.id)
+    cookie_lang = request.cookies.get(_LANGUAGE_COOKIE, "")
+    if cookie_lang in i18n.LANGUAGES:
+        await asyncio.to_thread(catalog.save_language, user.id, cookie_lang)
+    response = RedirectResponse(safe_next(nxt), status_code=303)
+    response.headers["Cache-Control"] = "no-store"
+    _set_session(response, token)
+    if explicit or cookie_lang in i18n.LANGUAGES:
+        _set_lang_cookie(response, cookie_lang if cookie_lang in i18n.LANGUAGES else language)
+    return response
+
+
+def _filters_from(params) -> CatalogFilters:
+    def text(name: str) -> str:
+        value = params.get(name, "")
+        return value if isinstance(value, str) else ""
+
+    return read_filters(
+        q=text("q"),
+        source=text("source"),
+        min_salary=text("min_salary"),
+        english=text("english"),
+        min_years=text("min_years"),
+        full_remote_only=text("full_remote_only"),
+        include_inactive=text("include_inactive"),
+        mine=text("mine"),
+        min_rating=text("min_rating"),
+        change=text("change"),
+        language=text("language"),
+        sort=text("sort"),
+        dir=text("dir"),
+    )
+
+
+def encode_view(filters: CatalogFilters, per_page: int) -> str:
+    return json.dumps(
+        dict(filter_params(filters, per_page)), ensure_ascii=False, separators=(",", ":")
+    )
+
+
+def decode_view(raw: str) -> tuple[CatalogFilters, int]:
+    if not raw:
+        return CatalogFilters(), DEFAULT_PER_PAGE
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return CatalogFilters(), DEFAULT_PER_PAGE
+    if not isinstance(data, dict):
+        return CatalogFilters(), DEFAULT_PER_PAGE
+
+    def text(name: str) -> str:
+        value = data.get(name, "")
+        return value if isinstance(value, str) else ""
+
+    _page, per_page = read_paging(per_page=text("per_page"))
+    return _filters_from({name: text(name) for name in _FILTER_KEYS}), per_page
+
+
+def _bound_view(request: Request, catalog: Catalog, user: User) -> tuple[CatalogFilters, int, int]:
+    """Filters from the query, or the ones this account last applied."""
+    params = request.query_params
+    page, per_page = read_paging(params.get("page", ""), params.get("per_page", ""))
+    if _FILTER_KEYS & set(params):
+        return _filters_from(params), page, per_page
+    filters, saved_per_page = decode_view(catalog.saved_filters(user.id))
+    if "per_page" not in params:
+        per_page = saved_per_page
+    return filters, page, per_page
+
+
+def _catalog_location(filters: CatalogFilters, per_page: int, page: int, lang: str) -> str:
+    params = filter_params(filters, per_page)
+    if page > 1:
+        params.append(("page", str(page)))
+    if lang:
+        params.append(("lang", lang))
+    return "/" if not params else "/?" + urlencode(params)
+
+
+def _current_location(request: Request) -> str:
+    return "/" if not request.url.query else "/?" + request.url.query
 
 
 def _error_page(language: str) -> str:
@@ -451,9 +739,10 @@ def _view(
     page: int,
     per_page: int,
     *,
+    user_id: int | None = None,
     clamp: bool = True,
 ) -> CatalogView:
-    stored = catalog.list_jobs(filters)
+    stored = catalog.list_jobs(filters, user_id)
     if clamp:
         page = min(page, max(1, -(-len(stored) // per_page)))
     active_count, inactive_count = catalog.counts()

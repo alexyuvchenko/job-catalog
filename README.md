@@ -118,7 +118,7 @@ Every row has buttons that save at once, without leaving the page:
 - ✓ viewed. Opening the title also marks it viewed. Press ✓ again to unmark.
 - ★ rating from 1 to 5. Press the same star again to clear it.
 
-Marks are stored in `data/catalog.sqlite` by link and survive refreshes. If a vacancy disappears and returns, its marks are still there. The page has no login, so anyone who can open it can change the marks. See [Open it on a phone](#open-it-on-a-phone).
+Marks are stored in `data/catalog.sqlite` by account and link, and they survive refreshes. If a vacancy disappears and returns, its marks are still there. Sign in from the catalog page. The first visit can create the account. Anyone who can open the address can create an account and read the shared list. Marks, ratings, and filters belong to the account that set them, so another account does not see yours. See [Open it on a phone](#open-it-on-a-phone).
 
 ### Filters and pages
 
@@ -131,7 +131,7 @@ Besides the text, source, salary, English, experience, and remote filters, you c
 | Changes in the last refresh | added, changed, closed |
 | Description language | English, Ukrainian |
 
-Filters apply when you change a select or press «Застосувати». On a phone the filters and the legend start folded, with the number of active filters in the title. The list shows 25, 50 (default), 100, or 200 rows per page. Use the page links, or press «Показати ще» to add the next rows under the current ones without reloading.
+Filters apply when you change a select or press «Застосувати». The account remembers the filters, sort, and page size, and the next visit opens with them. «Скинути» clears that saved view. On a phone the filters and the legend start folded, with the number of active filters in the title. The list shows 25, 50 (default), 100, or 200 rows per page. Use the page links, or press «Показати ще» to add the next rows under the current ones without reloading.
 
 The date, job, and company headings sort the list. Date starts with the newest vacancy, and a job or company name starts at the beginning of the alphabet; click the same heading again to reverse it. A vacancy with no date stays at the end. On a phone those headings are buttons above the cards. Sorting stays in place when you filter or turn the page. «Скинути» clears it.
 
@@ -145,17 +145,23 @@ uv run job-search --serve --host 0.0.0.0
 
 The log prints the address to use, for example `http://192.168.1.20:8765`. You can also find it with `ipconfig getifaddr en0` on macOS. Open that address on the phone. macOS may ask once to allow incoming connections.
 
-- The page has no login. Anyone on the same network can read the list, so use this only on a network you trust.
+- Sign in with the same account on the phone to see the same marks, ratings, and filters. A different account has its own.
+- Anyone who can reach the port can create an account and read the shared catalog, so use this only on a network you trust.
 - Only an IP address works in the browser. Names other than `localhost` are rejected.
-- Other devices can read, filter, and mark vacancies (favorite, viewed, and so on), so a phone and the computer share the same marks. «Оновити зараз» is disabled for them, because a refresh opens Chrome on the computer running the service. Use it on that computer.
+- «Оновити зараз» is disabled for other devices, because a refresh opens Chrome on the computer running the service. Use it on that computer.
 - Guest Wi-Fi often blocks devices from reaching each other. If the phone cannot connect, try the main network.
 - For access away from home without opening your network, run a private tunnel such as [Tailscale](https://tailscale.com/) on both devices. Its `100.x.x.x` addresses are accepted.
 
 Ctrl+C finishes the site already in progress, closes Chrome, and saves the sites read in that run. Sites that were not reached keep their previous vacancies. The catalog changes only when a refresh is saved, so stopping in the middle does not wipe the list.
 
+The catalog, marks, filters, and refresh require a signed-in session. Pages redirect to `/login`. `/api/jobs`, `/api/jobs/state`, and `/fragments/rows` answer 401. `/health` stays open. A call to `/api/jobs` with no filter query uses the account’s saved filters.
+
 | Request | What it returns |
 | --- | --- |
-| `GET /` | The catalog page. |
+| `GET /login`, `POST /login` | Sign in. The session cookie is `HttpOnly` and lasts 30 days. |
+| `GET /register`, `POST /register` | Create an account and sign in. |
+| `POST /logout` | End this browser’s session. |
+| `GET /` | The catalog page. Without a session, this redirects to `/login`. With a session and no filter query, it opens the account’s saved filters. `/?reset=1` clears them. |
 | `GET /health` | Whether a refresh is running, stored counts, the last finish time, and the last error. `GET /api/status` is the same. It answers 503 when the database cannot be read. |
 | `GET /?page=2&per_page=100` | A page of the list. `per_page` is 25, 50, 100, or 200. Other values fall back to the default. |
 | `GET /api/jobs` | The filtered list as JSON, not paged. It adds `active`, `change`, `changes`, `language`, `favorite`, `hidden`, `rating`, and `viewed` to each vacancy. Query parameters match the page: `q`, `source`, `min_salary`, `english`, `min_years`, `full_remote_only`, `include_inactive`, `mine` (`all`, `favorites`, `unviewed`, `viewed`, `rated`, `hidden`), `min_rating`, `change` (`added`, `changed`, `closed`), `language` (`en`, `uk`), `sort` (`date`, `job`, `company`), `dir` (`asc`, `desc`). |
@@ -172,7 +178,7 @@ The package is `src/jobsearch`, with tests in `tests/`.
 
 - `sources` — one module per job board
 - `http` — page fetch and off-screen Chrome
-- `db` — the SQLite catalog and the shared SQLite settings
+- `db` — the SQLite catalog, accounts, and the shared SQLite settings
 - `web` — the server and API (`server.py`), the catalog page (`pages.py`, `rows.py`, `styles.py`, `script.py`), the Ukrainian and English text (`i18n.py`), and the saved report (`report.py`)
 - `search.py`, `service.py`, `cli.py` — a one-off search, the refresh loop, and the command
 

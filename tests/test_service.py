@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+from tests.support import sign_in
 
 from jobsearch.cli import main
 from jobsearch.db.catalog import Catalog
@@ -115,6 +116,7 @@ class ServiceTests(unittest.TestCase):
                 raise RuntimeError("secret /tmp/catalog.sqlite")
 
             client = TestClient(app, base_url="http://127.0.0.1", raise_server_exceptions=False)
+            sign_in(client, catalog)
             health = client.get("/health")
             self.assertEqual(health.status_code, 200)
             self.assertEqual(health.json()["active"], 1)
@@ -191,6 +193,7 @@ class ServiceTests(unittest.TestCase):
             phone = TestClient(
                 network, base_url="http://192.168.1.20:8765", client=("192.168.1.50", 50000)
             )
+            sign_in(phone, catalog)
             self.assertEqual(phone.get("/").status_code, 200)
             self.assertIn("лише на комп’ютері", phone.get("/").text)
             self.assertEqual(len(phone.get("/api/jobs").json()), 1)
@@ -203,6 +206,7 @@ class ServiceTests(unittest.TestCase):
                 ("http://192.168.1.20:8765", "192.168.1.20"),
             ):
                 machine = TestClient(network, base_url=base, client=(peer, 50001))
+                sign_in(machine, catalog)
                 self.assertNotIn("лише на комп’ютері", machine.get("/").text)
                 allowed = machine.post("/refresh", headers={"Origin": base}, follow_redirects=False)
                 self.assertEqual(allowed.status_code, 303, base)

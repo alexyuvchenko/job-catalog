@@ -221,6 +221,43 @@ _TEXT: dict[str, dict[str, str]] = {
         "uk": "Нічого не знайдено за цими умовами.",
         "en": "Nothing matches these conditions.",
     },
+    # Accounts
+    "login_title": {"uk": "Вхід", "en": "Sign in"},
+    "register_title": {"uk": "Новий обліковий запис", "en": "Create an account"},
+    "login_lead": {
+        "uk": "Позначки, оцінки і фільтри зберігаються для цього облікового запису.",
+        "en": "Marks, ratings, and filters are kept for this account.",
+    },
+    "register_lead": {
+        "uk": "Каталог вакансій спільний. Ваші позначки, оцінки і фільтри бачите лише ви.",
+        "en": "The job catalog is shared. Only you see your marks, ratings, and filters.",
+    },
+    "username": {"uk": "Ім’я", "en": "Username"},
+    "password": {"uk": "Пароль", "en": "Password"},
+    "password_again": {"uk": "Пароль ще раз", "en": "Password again"},
+    "sign_in": {"uk": "Увійти", "en": "Sign in"},
+    "sign_out": {"uk": "Вийти", "en": "Sign out"},
+    "register_submit": {"uk": "Створити обліковий запис", "en": "Create account"},
+    "need_account": {"uk": "Немає облікового запису?", "en": "No account yet?"},
+    "have_account": {"uk": "Вже є обліковий запис?", "en": "Already have an account?"},
+    "go_register": {"uk": "Створити", "en": "Create one"},
+    "go_login": {"uk": "Увійти", "en": "Sign in"},
+    "auth_failed": {"uk": "Невірне ім’я або пароль.", "en": "Unknown username or password."},
+    "username_taken": {"uk": "Таке ім’я вже зайняте.", "en": "That username is already taken."},
+    "username_invalid": {
+        "uk": "Ім’я має містити від 1 до 64 символів.",
+        "en": "Username must be from 1 to 64 characters.",
+    },
+    "password_invalid": {
+        "uk": "Пароль має містити від 8 до 200 символів.",
+        "en": "Password must be from 8 to 200 characters.",
+    },
+    "password_mismatch": {"uk": "Паролі не збігаються.", "en": "Passwords do not match."},
+    "account_label": {"uk": "Обліковий запис", "en": "Account"},
+    "auth_note": {
+        "uk": "Бронювання — заява роботодавця, не автоматична відстрочка. Потрібні актуальні військово-облікові документи, а умови підтверджують на співбесіді.",
+        "en": "Reservation (бронювання) is the employer’s statement, not an automatic deferment. Current military-registration documents are required, and the terms are confirmed in the interview.",
+    },
     # Errors
     "error_title": {
         "uk": "Каталог тимчасово недоступний",
@@ -253,9 +290,9 @@ def raw(key: str, language: str) -> str:
     return _TEXT[key][language]
 
 
-def pick_language(query: str = "", cookie: str = "", accept: str = "") -> str:
+def pick_language(query: str = "", cookie: str = "", accept: str = "", saved: str = "") -> str:
     """The language to show: an explicit choice, then the saved one, then the browser's."""
-    for choice in (query, cookie):
+    for choice in (query, cookie, saved):
         if choice in LANGUAGES:
             return choice
     first = accept.split(",")[0].strip().lower() if accept else ""

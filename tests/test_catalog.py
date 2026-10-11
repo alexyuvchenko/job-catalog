@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from tests.support import sign_in
 
 from jobsearch.db.catalog import Catalog, CatalogFilters
 from jobsearch.models import Job, SourceStatus
@@ -195,6 +196,7 @@ class CatalogTests(unittest.TestCase):
             client = TestClient(
                 create_app(catalog, service, start_scheduler=False), base_url="http://127.0.0.1"
             )
+            sign_in(client, catalog)
             page = client.get("/")
             self.assertEqual(page.status_code, 200)
             self.assertIn("Python Developer", page.text)
