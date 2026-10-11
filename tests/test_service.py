@@ -8,7 +8,7 @@ from tests.support import sign_in
 from cli import main
 from core.models import Job, SourceStatus
 from jobs.refresh import MINIMUM_INTERVAL_HOURS, CatalogService
-from jobs.search import STOPPED, Query, run_search
+from jobs.search import DISABLED, STOPPED, Query, run_search
 from storage.catalog import Catalog
 from web.app import create_app
 from web.security import host_allowed
@@ -87,6 +87,7 @@ class TestService:
         assert not (by_name["DOU"].complete)
         assert "не знімаються" in by_name["DOU"].message
         assert by_name["Work.ua"].message == STOPPED
+        assert by_name["Jooble"].message == DISABLED
         assert not (by_name["Jooble"].ok)
 
     def test_health_security_and_refresh_origin(self, tmp_path):

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
 from core.classify import accept_remote, english_meets, is_it_role, salary_meets
+from core.constants import PAUSED_SOURCES
 from core.models import Job, Listing, SourceStatus
 from core.paths import CACHE_PATH
 from network.browser import Browser, BrowserError
@@ -12,7 +13,6 @@ from network.client import Client, FetchError
 from sources.djinni import fetch_jobs as fetch_djinni
 from sources.dou import fetch_jobs as fetch_dou
 from sources.dou import verify_reservation
-from sources.jooble import fetch_jobs as fetch_jooble
 from sources.robota import fetch_jobs as fetch_robota
 from sources.workua import fetch_jobs as fetch_workua
 from storage.sqlite import session
@@ -35,8 +35,9 @@ class Query:
 
 
 HTTP_SOURCES = (("Djinni", fetch_djinni), ("DOU", fetch_dou))
-BROWSER_SOURCES = (("Work.ua", fetch_workua), ("Robota.ua", fetch_robota), ("Jooble", fetch_jooble))
+BROWSER_SOURCES = (("Work.ua", fetch_workua), ("Robota.ua", fetch_robota))
 STOPPED = "оновлення зупинено, попередні вакансії лишаються"
+DISABLED = "тимчасово вимкнено, попередні вакансії лишаються"
 
 
 def run_search(
@@ -61,6 +62,8 @@ def run_search(
         _skip(statuses, [name for name, _fetcher in BROWSER_SOURCES])
     else:
         _collect_browser_sources(query, collected, statuses, stopped)
+    for name in PAUSED_SOURCES:
+        statuses.append(SourceStatus(name=name, ok=False, message=DISABLED, complete=False))
 
     filtered = [job for job in collected if _matches(job, query)]
     if query.verify and not stopped():

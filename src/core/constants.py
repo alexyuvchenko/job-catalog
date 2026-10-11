@@ -1,4 +1,5 @@
 SOURCE_NAMES = ("Djinni", "DOU", "Work.ua", "Robota.ua", "Jooble")
+PAUSED_SOURCES = ("Jooble",)
 
 ENGLISH_LEVELS = ("A1", "A2", "B1", "B2", "C1", "C2")
 

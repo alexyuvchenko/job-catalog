@@ -10,9 +10,9 @@ The search reads five boards:
 - **DOU** — remote listings that mention бронювання. A result is kept only when the vacancy page has DOU’s бронювання badge, so a booking-system product mention is not treated as a reservation offer.
 - **Work.ua** — remote IT jobs with the “Бронювання працівників” filter (`deferment=1`).
 - **Robota.ua** — remote vacancies whose listing is marked as employee reservation, limited to the IT rubric.
-- **Jooble** — remote search for бронювання. Jooble has no reservation filter, so a card is kept only when its text states it.
+- **Jooble** — paused for now. Existing Jooble rows stay until fetching is turned back on.
 
-Djinni and DOU are read with plain HTTP requests. Work.ua, Robota.ua, and Jooble refuse those, so the three open in Google Chrome off-screen. Chrome needs to be installed. Requests go one at a time, with a short pause.
+Djinni and DOU are read with plain HTTP requests. Work.ua and Robota.ua refuse those, so they open in Google Chrome off-screen. Chrome needs to be installed. Requests go one at a time, with a short pause.
 
 ### “Verify you are human”
 
@@ -70,7 +70,7 @@ uv run job-search --serve
 uv run job-search --serve --interval 3 --port 8765
 ```
 
-Open http://127.0.0.1:8765 . The page is a FastAPI app that listens on this computer only unless you pass `--host`. The first refresh starts immediately, and Chrome opens off-screen for Work.ua, Robota.ua, and Jooble. Later refreshes run every 6 hours. Leave the process running. Logs go to the terminal.
+Open http://127.0.0.1:8765 . The page is a FastAPI app that listens on this computer only unless you pass `--host`. The first refresh starts immediately, and Chrome opens off-screen for Work.ua and Robota.ua. Later refreshes run every 6 hours. Leave the process running. Logs go to the terminal.
 
 | Flag | Meaning |
 | --- | --- |

@@ -18,12 +18,12 @@ _TEXT: dict[str, dict[str, str]] = {
         "en": "Remote IT jobs with reservation",
     },
     "lede_catalog": {
-        "uk": "Каталог віддалених IT-вакансій в Україні, де роботодавець заявляє бронювання від мобілізації. Список збирається з Djinni, DOU, Work.ua, Robota.ua і Jooble і оновлюється сам.",
-        "en": "A catalog of remote IT jobs in Ukraine where the employer states it can reserve an employee from mobilization (бронювання). It is collected from Djinni, DOU, Work.ua, Robota.ua and Jooble and updates itself.",
+        "uk": "Каталог віддалених IT-вакансій в Україні, де роботодавець заявляє бронювання від мобілізації. Список збирається з Djinni, DOU, Work.ua і Robota.ua і оновлюється сам. Jooble зараз вимкнено.",
+        "en": "A catalog of remote IT jobs in Ukraine where the employer states it can reserve an employee from mobilization (бронювання). It is collected from Djinni, DOU, Work.ua and Robota.ua and updates itself. Jooble is paused for now.",
     },
     "lede_report": {
-        "uk": "Пошук віддаленої роботи в IT в Україні на Djinni, DOU, Work.ua, Robota.ua і Jooble серед вакансій, де роботодавець заявляє бронювання від мобілізації.",
-        "en": "Remote IT jobs in Ukraine from Djinni, DOU, Work.ua, Robota.ua and Jooble where the employer states it can reserve an employee from mobilization.",
+        "uk": "Пошук віддаленої роботи в IT в Україні на Djinni, DOU, Work.ua і Robota.ua серед вакансій, де роботодавець заявляє бронювання від мобілізації. Jooble зараз вимкнено.",
+        "en": "Remote IT jobs in Ukraine from Djinni, DOU, Work.ua and Robota.ua where the employer states it can reserve an employee from mobilization. Jooble is paused for now.",
     },
     "banner_running": {
         "uk": "Зараз оновлюю каталог. Список на екрані лишається, а нові дані з’являться самі.",
@@ -134,6 +134,7 @@ _TEXT: dict[str, dict[str, str]] = {
     "remote_office": {"uk": "офіс", "en": "office"},
     "remote_unknown": {"uk": "формат не вказано", "en": "format not stated"},
     "chip_error": {"uk": "помилка", "en": "error"},
+    "chip_paused": {"uk": "вимкнено", "en": "paused"},
     # Marks
     "act_favorite": {"uk": "Обране", "en": "Favorite"},
     "act_hide": {"uk": "Не для мене", "en": "Not for me"},
@@ -205,12 +206,12 @@ _TEXT: dict[str, dict[str, str]] = {
         "en": "remote jobs; only those that state reservation in the text are kept",
     },
     "note_catalog": {
-        "uk": "Бронювання — це заява роботодавця, що посаду можна включити в бронювання військовозобов’язаних працівників. Це не автоматична відстрочка: потрібні актуальні військово-облікові документи, а рішення залежить від статусу компанії і чинного порядку. Умови варто підтвердити на співбесіді. Вакансія зникає з активного списку, коли її більше немає у джерелі під час чергового оновлення. Якщо сайт не відповів, попередні вакансії цього джерела залишаються. Work.ua, Robota.ua і Jooble відкриваються через Chrome поза екраном. У Jooble залишаються лише картки, де в тексті є бронювання.",
-        "en": "Бронювання (reservation) is the employer’s statement that the role can be included in the reservation of conscripted employees. It is not an automatic deferment: you still need current military-registration documents, and the outcome depends on the company’s status and the rules in force. Confirm the terms in the interview. A vacancy leaves the active list when it is no longer at its source during a refresh. If a site did not answer, its previous vacancies stay. Work.ua, Robota.ua and Jooble are read through Chrome off-screen. From Jooble only cards that state reservation in the text are kept.",
+        "uk": "Бронювання — це заява роботодавця, що посаду можна включити в бронювання військовозобов’язаних працівників. Це не автоматична відстрочка: потрібні актуальні військово-облікові документи, а рішення залежить від статусу компанії і чинного порядку. Умови варто підтвердити на співбесіді. Вакансія зникає з активного списку, коли її більше немає у джерелі під час чергового оновлення. Якщо сайт не відповів, попередні вакансії цього джерела залишаються. Work.ua і Robota.ua відкриваються через Chrome поза екраном. Jooble зараз не читається.",
+        "en": "Бронювання (reservation) is the employer’s statement that the role can be included in the reservation of conscripted employees. It is not an automatic deferment: you still need current military-registration documents, and the outcome depends on the company’s status and the rules in force. Confirm the terms in the interview. A vacancy leaves the active list when it is no longer at its source during a refresh. If a site did not answer, its previous vacancies stay. Work.ua and Robota.ua are read through Chrome off-screen. Jooble is not fetched for now.",
     },
     "note_report": {
-        "uk": "Бронювання — це заява роботодавця, що посаду можна включити в бронювання військовозобов’язаних працівників. Це не автоматична відстрочка: потрібні актуальні військово-облікові документи, а рішення залежить від статусу компанії і чинного порядку. Умови варто підтвердити на співбесіді. Work.ua, Robota.ua і Jooble відкриваються через Chrome, бо інакше сайти не віддають сторінку. Вікно Chrome з’являється поза екраном на час пошуку. У Jooble немає окремого фільтра бронювання, тому залишаються лише картки, де це написано в тексті.",
-        "en": "Бронювання (reservation) is the employer’s statement that the role can be included in the reservation of conscripted employees. It is not an automatic deferment: you still need current military-registration documents, and the outcome depends on the company’s status and the rules in force. Confirm the terms in the interview. Work.ua, Robota.ua and Jooble are read through Chrome, because the sites refuse plain requests. The Chrome window stays off-screen during the search. Jooble has no reservation filter, so only cards that state it in the text are kept.",
+        "uk": "Бронювання — це заява роботодавця, що посаду можна включити в бронювання військовозобов’язаних працівників. Це не автоматична відстрочка: потрібні актуальні військово-облікові документи, а рішення залежить від статусу компанії і чинного порядку. Умови варто підтвердити на співбесіді. Work.ua і Robota.ua відкриваються через Chrome, бо інакше сайти не віддають сторінку. Вікно Chrome з’являється поза екраном на час пошуку. Jooble зараз не читається.",
+        "en": "Бронювання (reservation) is the employer’s statement that the role can be included in the reservation of conscripted employees. It is not an automatic deferment: you still need current military-registration documents, and the outcome depends on the company’s status and the rules in force. Confirm the terms in the interview. Work.ua and Robota.ua are read through Chrome, because the sites refuse plain requests. The Chrome window stays off-screen during the search. Jooble is not fetched for now.",
     },
     "report_count": {"uk": "{n} вакансій", "en": "{n} jobs"},
     "report_new": {

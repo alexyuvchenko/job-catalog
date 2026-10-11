@@ -75,9 +75,7 @@ def main(argv: list[str] | None = None) -> int:
         verify=not args.no_verify,
         refresh=args.refresh,
     )
-    print(
-        "Reading public listings on Djinni, DOU, Work.ua, Robota.ua, and Jooble…", file=sys.stderr
-    )
+    print("Reading public listings on Djinni, DOU, Work.ua, and Robota.ua…", file=sys.stderr)
     jobs, statuses = run_search(query)
     for status in statuses:
         print(f"{status.name}: {status.message} (shown {status.kept})", file=sys.stderr)

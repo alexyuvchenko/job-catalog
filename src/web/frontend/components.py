@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from html import escape
 
+from core.constants import PAUSED_SOURCES
 from core.models import SourceStatus
 from web.frontend.i18n import Translator
 
@@ -44,7 +45,9 @@ def source_chips(statuses: list[SourceStatus], t: Translator) -> str:
 
 
 def _chip(status: SourceStatus, t: Translator) -> str:
-    if not status.ok:
+    if status.name in PAUSED_SOURCES:
+        css, detail = "warn", t("chip_paused")
+    elif not status.ok:
         css, detail = "bad", t("chip_error")
     elif not status.complete:
         css, detail = "warn", str(status.kept)
