@@ -12,6 +12,7 @@ from core.models import Job
 from jobs.search import Query, run_search
 from web.app import serve
 from web.frontend.report import write_outputs
+from web.security import is_public_hostname
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -27,6 +28,19 @@ def main(argv: list[str] | None = None) -> int:
         type=_host,
         default="127.0.0.1",
         help="address to listen on; 0.0.0.0 lets other devices on the network read the list",
+    )
+    parser.add_argument(
+        "--public-host",
+        action="append",
+        default=[],
+        type=_public_host,
+        metavar="NAME",
+        help="DNS name the reverse proxy or tunnel will use; repeat for each name",
+    )
+    parser.add_argument(
+        "--no-register",
+        action="store_true",
+        help="do not let visitors create accounts",
     )
     parser.add_argument("--interval", type=float, default=6, help="hours between catalog refreshes")
     parser.add_argument(
@@ -59,7 +73,14 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.serve:
         interval = args.interval if args.interval > 0 else 6
-        serve(args.port, interval_hours=interval, pages=args.catalog_pages, host=args.host)
+        serve(
+            args.port,
+            interval_hours=interval,
+            pages=args.catalog_pages,
+            host=args.host,
+            public_hosts=args.public_host,
+            allow_register=not args.no_register,
+        )
         return 0
 
     pages = min(max(args.pages, 1), 10)
@@ -99,6 +120,13 @@ def _host(value: str) -> str:
     except ValueError:
         raise argparse.ArgumentTypeError("host must be localhost or an IP address") from None
     return value
+
+
+def _public_host(value: str) -> str:
+    name = value.strip().lower().rstrip(".")
+    if not is_public_hostname(name):
+        raise argparse.ArgumentTypeError("public host must be a DNS name, not an IP address")
+    return name
 
 
 def _port(value: str) -> int:

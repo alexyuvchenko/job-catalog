@@ -254,6 +254,10 @@ _TEXT: dict[str, dict[str, str]] = {
         "en": "Password must be from 8 to 200 characters.",
     },
     "password_mismatch": {"uk": "Паролі не збігаються.", "en": "Passwords do not match."},
+    "register_closed": {
+        "uk": "Нові облікові записи зараз не створюються. Увійдіть, якщо запис уже є.",
+        "en": "New accounts are not being created. Sign in if you already have one.",
+    },
     "account_label": {"uk": "Обліковий запис", "en": "Account"},
     "auth_note": {
         "uk": "Бронювання — заява роботодавця, не автоматична відстрочка. Потрібні актуальні військово-облікові документи, а умови підтверджують на співбесіді.",

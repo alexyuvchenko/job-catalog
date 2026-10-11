@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from core.log import configure_logging
 from jobs.refresh import CatalogService
@@ -33,6 +35,8 @@ def create_app(
     service: CatalogService,
     start_scheduler: bool = True,
     allow_lan: bool = False,
+    public_hosts: Sequence[str] = (),
+    allow_register: bool = True,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -41,12 +45,24 @@ def create_app(
         yield
         service.stop()
 
-    app = FastAPI(title="Віддалені IT-вакансії з бронюванням", lifespan=lifespan)
-    app.add_middleware(AllowedHosts, allow_lan=allow_lan)
+    hosts = frozenset(host.strip().lower().rstrip(".") for host in public_hosts if host.strip())
+    docs = "/docs" if not hosts else None
+    app = FastAPI(
+        title="Віддалені IT-вакансії з бронюванням",
+        lifespan=lifespan,
+        docs_url=docs,
+        redoc_url=None if hosts else "/redoc",
+        openapi_url=None if hosts else "/openapi.json",
+    )
+    app.add_middleware(AllowedHosts, allow_lan=allow_lan, public_hosts=hosts)
     app.add_middleware(SecurityHeaders)
+    if hosts:
+        app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["127.0.0.1", "::1", "localhost"])
     app.state.catalog = catalog
     app.state.service = service
     app.state.allow_lan = allow_lan
+    app.state.public_hosts = hosts
+    app.state.allow_register = allow_register
     app.include_router(auth_router)
     app.include_router(catalog_router)
 
@@ -67,6 +83,8 @@ def serve(
     interval_hours: float = 6,
     pages: int = 100,
     host: str = "127.0.0.1",
+    public_hosts: Sequence[str] = (),
+    allow_register: bool = True,
 ) -> None:
     if not 1 <= port <= 65535:
         raise SystemExit("Port must be from 1 to 65535.")
@@ -76,9 +94,27 @@ def serve(
     catalog = Catalog()
     service = CatalogService(catalog, interval_hours=interval_hours, pages=pages)
     open_to_network = not is_local_bind(host)
-    app = create_app(catalog, service, allow_lan=open_to_network)
+    hosts = tuple(host.strip().lower().rstrip(".") for host in public_hosts if host.strip())
+    app = create_app(
+        catalog,
+        service,
+        allow_lan=open_to_network,
+        public_hosts=hosts,
+        allow_register=allow_register,
+    )
     log.info("Open http://127.0.0.1:%s", port)
-    if open_to_network:
+    if hosts:
+        shown = ", ".join(f"https://{name}" for name in hosts)
+        log.info("Public name(s): %s. Put HTTPS in front (a tunnel or reverse proxy).", shown)
+        if app.state.allow_register:
+            log.warning(
+                "Registration is open. Anyone who can open the public address can create an "
+                "account and read the shared list."
+            )
+        else:
+            log.info("Registration is closed. Create accounts on this computer first.")
+        log.info("Refreshing stays limited to this computer.")
+    elif open_to_network:
         address = network_address() if host in ("0.0.0.0", "::") else host
         if address:
             log.info("On another device in this network open http://%s:%s", address, port)

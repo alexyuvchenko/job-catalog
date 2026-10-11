@@ -11,7 +11,7 @@ from jobs.refresh import MINIMUM_INTERVAL_HOURS, CatalogService
 from jobs.search import DISABLED, STOPPED, Query, run_search
 from storage.catalog import Catalog
 from web.app import create_app
-from web.security import host_allowed
+from web.security import host_allowed, is_public_hostname
 
 
 class TestService:
@@ -153,6 +153,15 @@ class TestService:
         with patch("cli.serve") as serve:
             main(["--serve"])
         assert serve.call_args.kwargs["host"] == "127.0.0.1"
+        with pytest.raises(SystemExit):
+            main(["--serve", "--public-host", "127.0.0.1"])
+        with patch("cli.serve") as serve:
+            main(["--serve", "--public-host", "Catalog.Example.com."])
+        assert serve.call_args.kwargs["public_hosts"] == ["catalog.example.com"]
+        assert serve.call_args.kwargs["allow_register"] is True
+        with patch("cli.serve") as serve:
+            main(["--serve", "--public-host", "catalog.example.com", "--no-register"])
+        assert serve.call_args.kwargs["allow_register"] is False
 
     def test_host_rules(self):
         assert host_allowed("127.0.0.1:8765", False)
@@ -163,6 +172,15 @@ class TestService:
             assert host_allowed(address, True), address
         for name in ("8.8.8.8", "evil.example", "192.168.1.20.evil.example", ""):
             assert not host_allowed(name, True), name
+        public = frozenset({"catalog.example.com"})
+        assert host_allowed("catalog.example.com", False, public)
+        assert host_allowed("catalog.example.com:443", False, public)
+        assert not host_allowed("other.example.com", False, public)
+        assert is_public_hostname("catalog.example.com")
+        assert is_public_hostname("abc.trycloudflare.com")
+        assert not is_public_hostname("localhost")
+        assert not is_public_hostname("192.168.1.20")
+        assert not is_public_hostname("8.8.8.8")
 
     def test_a_phone_on_the_network_can_read_but_not_refresh(self, tmp_path):
         catalog = Catalog(tmp_path / "catalog.sqlite")
@@ -204,6 +222,54 @@ class TestService:
             TestClient(local_only, base_url="http://192.168.1.20:8765").get("/").status_code == 400
         )
         assert TestClient(network, base_url="http://8.8.8.8").get("/health").status_code == 400
+
+    def test_a_named_public_host_accepts_new_accounts(self, tmp_path):
+        catalog = Catalog(tmp_path / "catalog.sqlite")
+        catalog.merge(
+            [_job()],
+            [SourceStatus("Djinni", True, "ok", fetched=1, kept=1)],
+            "2026-10-10 10:00:00",
+            "2026-10-10 10:01:00",
+        )
+        service = CatalogService(catalog, interval_hours=24, pages=1)
+        app = create_app(
+            catalog,
+            service,
+            start_scheduler=False,
+            public_hosts=("catalog.example.com",),
+        )
+        client = TestClient(app, base_url="https://catalog.example.com")
+        assert client.get("/health").status_code == 200
+        assert client.get("/docs").status_code == 404
+        login = client.get("/login")
+        assert "/register" in login.text
+        created = client.post(
+            "/register",
+            data={"username": "eve", "password": "password-1", "password2": "password-1"},
+            follow_redirects=False,
+        )
+        assert created.status_code == 303
+        cookie = created.headers.get("set-cookie", "")
+        assert "session=" in cookie
+        assert "Secure" in cookie
+        assert catalog.authenticate("eve", "password-1") is not None
+        assert TestClient(app, base_url="https://evil.example").get("/health").status_code == 400
+
+        closed = create_app(
+            catalog,
+            service,
+            start_scheduler=False,
+            public_hosts=("catalog.example.com",),
+            allow_register=False,
+        )
+        visitor = TestClient(closed, base_url="https://catalog.example.com")
+        assert "/register" not in visitor.get("/login").text
+        assert "не створюються" in visitor.get("/register").text
+        visitor.post(
+            "/register",
+            data={"username": "mallory", "password": "password-1", "password2": "password-1"},
+        )
+        assert catalog.authenticate("mallory", "password-1") is None
 
 
 def _job(**overrides) -> Job:

@@ -12,6 +12,7 @@ from storage.catalog import Catalog
 from web.auth.service import SESSION_COOKIE, SESSION_DAYS, User, safe_next
 from web.frontend import i18n
 from web.language import LANGUAGE_COOKIE, set_lang_cookie
+from web.security import cookie_secure
 
 _MAX_FORM = 10_000
 
@@ -32,19 +33,20 @@ def ask_sign_in(request: Request) -> RedirectResponse | JSONResponse:
     return RedirectResponse("/login?next=" + quote(safe_next(nxt), safe=""), status_code=303)
 
 
-def set_session(response: RedirectResponse, token: str) -> None:
+def set_session(response: RedirectResponse, token: str, *, secure: bool) -> None:
     response.set_cookie(
         SESSION_COOKIE,
         token,
         max_age=SESSION_DAYS * 24 * 3600,
         httponly=True,
         samesite="lax",
+        secure=secure,
         path="/",
     )
 
 
-def clear_session(response: RedirectResponse) -> None:
-    response.delete_cookie(SESSION_COOKIE, path="/", samesite="lax")
+def clear_session(response: RedirectResponse, *, secure: bool) -> None:
+    response.delete_cookie(SESSION_COOKIE, path="/", samesite="lax", secure=secure)
 
 
 async def form_body(request: Request) -> dict[str, str] | None:
@@ -75,7 +77,12 @@ async def start_session(
         await asyncio.to_thread(catalog.save_language, user.id, cookie_lang)
     response = RedirectResponse(safe_next(nxt), status_code=303)
     response.headers["Cache-Control"] = "no-store"
-    set_session(response, token)
+    secure = cookie_secure(request)
+    set_session(response, token, secure=secure)
     if explicit or cookie_lang in i18n.LANGUAGES:
-        set_lang_cookie(response, cookie_lang if cookie_lang in i18n.LANGUAGES else language)
+        set_lang_cookie(
+            response,
+            cookie_lang if cookie_lang in i18n.LANGUAGES else language,
+            secure=secure,
+        )
     return response

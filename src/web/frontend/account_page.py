@@ -16,6 +16,7 @@ def render_auth(
     error: str = "",
     username: str = "",
     next_path: str = "/",
+    allow_register: bool = True,
 ) -> str:
     """``mode`` is ``login`` or ``register``."""
     t = translator(language)
@@ -35,11 +36,13 @@ def render_auth(
     hidden_next = ""
     if mode == "login":
         hidden_next = f'<input type="hidden" name="next" value="{escape(next_path)}">'
-    if mode == "login":
+    if mode == "login" and allow_register:
         switch = (
             f'<p class="switch">{escape(t("need_account"))} '
             f'<a href="{_href("/register", language)}">{escape(t("go_register"))}</a></p>'
         )
+    elif mode == "login":
+        switch = ""
     else:
         switch = (
             f'<p class="switch">{escape(t("have_account"))} '

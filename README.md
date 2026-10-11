@@ -76,6 +76,8 @@ Open http://127.0.0.1:8765 . The page is a FastAPI app that listens on this comp
 | --- | --- |
 | `--port` | Address port. The default is 8765. |
 | `--host` | Address to listen on. The default is `127.0.0.1`, which only this computer can reach. `0.0.0.0` lets other devices on the network open the page. See [Open it on a phone](#open-it-on-a-phone). |
+| `--public-host NAME` | DNS name a reverse proxy or tunnel will send. Repeat for each name. See [Publish on the internet](#publish-on-the-internet). |
+| `--no-register` | Do not let visitors create accounts. |
 | `--interval` | Hours between refreshes. The default is 6. Values are kept between 15 minutes and 7 days. |
 | `--catalog-pages` | Safety ceiling for pages per site. The default is 100. Each site still stops when its own listings run out. |
 
@@ -151,6 +153,24 @@ The log prints the address to use, for example `http://192.168.1.20:8765`. You c
 - «Оновити зараз» is disabled for other devices, because a refresh opens Chrome on the computer running the service. Use it on that computer.
 - Guest Wi-Fi often blocks devices from reaching each other. If the phone cannot connect, try the main network.
 - For access away from home without opening your network, run a private tunnel such as [Tailscale](https://tailscale.com/) on both devices. Its `100.x.x.x` addresses are accepted.
+
+### Publish on the internet
+
+The process should still listen on this computer. Put HTTPS in front of it (a reverse proxy or a tunnel). Do not forward port 8765 on the router: Cactus often has no public IPv4, and a raw port has no TLS.
+
+Anyone who can open the public address can create an account and read the shared catalog. Pass `--no-register` if you want only accounts created on this computer.
+
+```bash
+uv run job-search --serve --public-host catalog.example.com
+```
+
+Point the proxy or tunnel at `http://127.0.0.1:8765` and use that DNS name. A temporary Cloudflare tunnel is:
+
+```bash
+cloudflared tunnel --url http://127.0.0.1:8765
+```
+
+Then restart with the hostname it prints, for example `--public-host random-words.trycloudflare.com`. Open `https://…` in the browser, not `http://`. Only the names you listed are accepted. `/docs` is off. «Оновити зараз» still only works on this computer.
 
 Ctrl+C finishes the site already in progress, closes Chrome, and saves the sites read in that run. Sites that were not reached keep their previous vacancies. The catalog changes only when a refresh is saved, so stopping in the middle does not wipe the list.
 

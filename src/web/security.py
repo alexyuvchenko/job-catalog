@@ -29,14 +29,16 @@ _SECURITY_HEADERS = {
 }
 
 
-def host_allowed(header: str, allow_lan: bool) -> bool:
-    """Accept only this machine, or, on a trusted network, a private IP address.
+def host_allowed(header: str, allow_lan: bool, public_hosts: frozenset[str] = frozenset()) -> bool:
+    """Accept this machine, a private IP on a trusted network, or a named public host.
 
-    Names other than localhost are never accepted, so a web page cannot point its own
-    domain at this service (DNS rebinding).
+    Unknown names are never accepted, so a web page cannot point its own domain at this
+    service (DNS rebinding).
     """
     name = _host_name(header)
     if name in _LOCAL_NAMES:
+        return True
+    if name in public_hosts:
         return True
     if not allow_lan:
         return False
@@ -61,13 +63,18 @@ def _host_name(header: str) -> str:
 
 
 class AllowedHosts:
-    def __init__(self, app: ASGIApp, allow_lan: bool) -> None:
+    def __init__(
+        self, app: ASGIApp, allow_lan: bool, public_hosts: frozenset[str] = frozenset()
+    ) -> None:
         self.app = app
         self.allow_lan = allow_lan
+        self.public_hosts = public_hosts
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] in ("http", "websocket"):
-            if not host_allowed(Headers(scope=scope).get("host", ""), self.allow_lan):
+            if not host_allowed(
+                Headers(scope=scope).get("host", ""), self.allow_lan, self.public_hosts
+            ):
                 if scope["type"] == "http":
                     await PlainTextResponse("Invalid host header", status_code=400)(
                         scope, receive, send
@@ -127,6 +134,34 @@ def is_local_bind(host: str) -> bool:
         return ipaddress.ip_address(host).is_loopback
     except ValueError:
         return False
+
+
+def cookie_secure(request: Request) -> bool:
+    return request.url.scheme == "https"
+
+
+def is_public_hostname(value: str) -> bool:
+    """A DNS name this process may list as its public address. Not an IP."""
+    name = value.strip().lower().rstrip(".")
+    if not name or name in _LOCAL_NAMES or len(name) > 253:
+        return False
+    try:
+        ipaddress.ip_address(name)
+    except ValueError:
+        pass
+    else:
+        return False
+    labels = name.split(".")
+    if len(labels) < 2:
+        return False
+    return all(
+        label
+        and len(label) <= 63
+        and label[0] != "-"
+        and label[-1] != "-"
+        and label.replace("-", "").isalnum()
+        for label in labels
+    )
 
 
 def is_address(host: str) -> bool:
