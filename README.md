@@ -6,11 +6,13 @@ Search public IT listings in Ukraine for remote roles whose employers say they c
 
 The search reads five boards:
 
-- **Djinni** — the official “Бронювання” filter plus remote work. Every result from this filter is treated as confirmed.
-- **DOU** — remote listings that mention бронювання. A result is kept only when the vacancy page has DOU’s бронювання badge, so a booking-system product mention is not treated as a reservation offer.
-- **Work.ua** — remote IT jobs with the “Бронювання працівників” filter (`deferment=1`).
-- **Robota.ua** — remote vacancies whose listing is marked as employee reservation, limited to the IT rubric.
-- **Jooble** — paused for now. Existing Jooble rows stay until fetching is turned back on.
+- **Djinni** — the official “Бронювання” filter plus remote work. Every result from this filter is treated as confirmed. The list keeps IT titles only.
+- **DOU** — remote listings that mention бронювання. A result is kept only when the vacancy page has DOU’s бронювання badge, so a booking-system product mention is not treated as a reservation offer. The list keeps IT titles only.
+- **Work.ua** — remote jobs with the official “Бронювання працівників” filter (`deferment=1`), in every industry. A result is kept only when the title is an IT role.
+- **Robota.ua** — remote vacancies whose listing is marked as employee reservation, in every rubric. A result is kept only when the title is an IT role.
+- **Jooble** — paused for now. Existing Jooble rows stay until fetching is turned back on. When fetching is on, a card is kept only if the text states reservation and the title is an IT role.
+
+IT titles are the engineering focus: developer, програміст, DevOps, системний адміністратор, QA, and the same set used elsewhere. A reserved warehouse or sales role is dropped.
 
 Djinni and DOU are read with plain HTTP requests. Work.ua and Robota.ua refuse those, so they open in Google Chrome off-screen. Chrome needs to be installed. Requests go one at a time, with a short pause.
 
@@ -43,7 +45,7 @@ uv run job-search --keyword python --pages 2 --open
 | `--keyword` | Role or technology. Empty shows every matching IT role. |
 | `--pages` | Listing pages to read from each site, from 1 to 10. The default is 2. |
 | `--focus engineering` | Developers, QA, DevOps, data, security, product, project, design, analysts. This is the default. |
-| `--focus all` | Also keep HR, marketing, and sales roles at these companies. |
+| `--focus all` | Do not drop by title after a source already kept the row. The boards themselves still keep only IT titles. |
 | `--full-remote-only` | Hide hybrid roles that also name a city. |
 | `--min-salary 2500` | Hide USD ranges whose top is below this number. Roles without a salary, and roles listed in UAH or EUR, stay. |
 | `--english B2` | Hide roles that state a lower level. Unknown English stays. DOU usually does not state a level on the card. |

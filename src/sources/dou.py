@@ -7,7 +7,13 @@ from dataclasses import dataclass
 from html import unescape
 from pathlib import Path
 
-from core.classify import dou_remote_mode, evidence_sentence, parse_dou_date, parse_salary
+from core.classify import (
+    dou_remote_mode,
+    evidence_sentence,
+    is_it_title,
+    parse_dou_date,
+    parse_salary,
+)
 from core.models import Job, Listing
 from network.client import Client, FetchError
 from storage.sqlite import connect
@@ -32,8 +38,9 @@ def search_url(keyword: str) -> str:
 def fetch_jobs(client: Client, keyword: str, pages: int) -> Listing:
     page_url = search_url(keyword)
     html = client.get_text(page_url)
-    jobs = parse_dou_html(html)
-    seen = {job.job_id for job in jobs}
+    parsed = parse_dou_html(html)
+    seen = {job.job_id for job in parsed}
+    jobs = [job for job in parsed if is_it_title(job.title)]
     total_match = re.search(r"<h1>\s*(\d+)", html)
     total = int(total_match.group(1)) if total_match else None
     shown = len(re.findall(r'class="l-vacancy', html))
@@ -58,15 +65,16 @@ def fetch_jobs(client: Client, keyword: str, pages: int) -> Listing:
             if job.job_id in seen:
                 continue
             seen.add(job.job_id)
-            jobs.append(job)
             added += 1
+            if is_it_title(job.title):
+                jobs.append(job)
         shown += int(payload.get("num") or added or 0)
         last = bool(payload.get("last")) or added == 0
         loaded_pages += 1
     if total is not None:
-        message = f"прочитано {len(jobs)} із близько {total} згадок «бронювання»"
+        message = f"прочитано {len(jobs)} IT-вакансій із близько {total} згадок «бронювання»"
     else:
-        message = f"прочитано {len(jobs)} згадок «бронювання»"
+        message = f"прочитано {len(jobs)} IT-вакансій зі згадкою «бронювання»"
     if stopped:
         message += "; наступні сторінки не відкрились, тож попередні вакансії DOU не знімаються"
     return Listing(jobs, message, complete=not stopped)

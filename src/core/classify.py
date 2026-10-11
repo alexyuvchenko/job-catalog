@@ -27,7 +27,7 @@ _ENGINEERING = re.compile(
     r"\bdata\b|analyst|аналітик|scientist|architect|архітектор|"
     r"designer|дизайнер|product manager|продакт|"
     r"project manager|проджект|проєктний менеджер|\bscrum\b|"
-    r"embedded|security|кібер|sysadmin|системний адміністратор|"
+    r"embedded|security|кібер|sysadmin|сисадмін|системн(?:ий|ого)?\s*адмін|"
     r"\bdba\b|frontend|front-end|front end|backend|back-end|back end|"
     r"fullstack|full-stack|full stack|\bios\b|android|flutter|"
     r"\bpython\b|\bjava\b|\bphp\b|\bnode\b|\breact\b|\bvue\b|"
@@ -109,6 +109,11 @@ def is_it_role(title: str, category: str, focus: str) -> bool:
     if _NON_ENGINEERING.search(blob):
         return False
     return _ENGINEERING.search(blob) is not None
+
+
+def is_it_title(title: str) -> bool:
+    """The vacancy title is an engineering or product IT role, ignoring company industry."""
+    return is_it_role(title, "", "engineering")
 
 
 def parse_english(text: str) -> str:

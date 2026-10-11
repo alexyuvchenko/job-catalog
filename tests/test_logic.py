@@ -1,5 +1,6 @@
 from datetime import date
 from http.cookiejar import Cookie
+from unittest.mock import patch
 
 from core.classify import (
     accept_remote,
@@ -17,11 +18,14 @@ from core.classify import (
 from core.models import Job
 from network.browser import asks_for_human, is_browser_check
 from network.client import Client
+from sources.djinni import fetch_jobs as fetch_djinni
 from sources.djinni import parse_djinni_html
 from sources.dou import has_reservation_badge, parse_dou_html
 from sources.jooble import job_from_card as jooble_job
 from sources.robota import job_from_item
+from sources.workua import fetch_jobs as fetch_workua
 from sources.workua import job_from_card as work_job
+from sources.workua import search_url as work_search_url
 
 
 class TestBrowserCheck:
@@ -42,6 +46,9 @@ class TestClassify:
             "Бізнес-аналітик з бухгалтерського та фінансового обліку",
             "BIM Team Lead",
             "Fullstack Engineer (Banking)",
+            "Програміст 1C",
+            "Системний адміністратор",
+            "сисадмін",
         ]
         dropped = [
             "Креативний маркетолог",
@@ -51,6 +58,7 @@ class TestClassify:
             "Senior SEO Specialist",
             "Head of Accounts Receivable",
             "Head of HR Operations",
+            "Водій навантажувача",
         ]
         for title in kept:
             assert is_it_role(title, "", "engineering"), title
@@ -165,6 +173,18 @@ class TestParsers:
         jobs, _ = parse_djinni_html(html)
         assert jobs[0].remote == "remote"
 
+        class Fake:
+            def get_text(self, url, referer=None):
+                return "page"
+
+        mixed = [
+            _job(job_id="1", title="Водій навантажувача", url="https://djinni.co/jobs/1"),
+            _job(job_id="2", title="Програміст 1C", url="https://djinni.co/jobs/2"),
+        ]
+        with patch("sources.djinni.parse_djinni_html", return_value=(mixed, 2)):
+            listing = fetch_djinni(Fake(), "", 2)
+        assert [job.title for job in listing.jobs] == ["Програміст 1C"]
+
     def test_dou_card_and_badge(self):
         html = """
         <li class="l-vacancy __hot">
@@ -242,6 +262,79 @@ class TestParsers:
         assert hybrid.salary_max == 2000
         assert hybrid.currency == "USD"
         assert parse_relative_date("2 дні тому", today) == "2026-10-08"
+        assert (
+            work_job(
+                {
+                    "href": "/jobs/1059007/",
+                    "title": "Програміст 1C",
+                    "company": "Klion group",
+                    "lines": ["Дистанційно"],
+                    "published": "",
+                    "salary": "",
+                    "snippet": "БРОНЮВАННЯ",
+                    "reserved": True,
+                }
+            )
+            is not None
+        )
+        assert (
+            work_job(
+                {
+                    "href": "/jobs/3/",
+                    "title": "Водій навантажувача",
+                    "company": "Klion group",
+                    "lines": ["Вінниця"],
+                    "published": "",
+                    "salary": "",
+                    "snippet": "БРОНЮВАННЯ",
+                    "reserved": True,
+                }
+            )
+            is None
+        )
+        assert "industry" not in work_search_url("", 1)
+        assert work_search_url("", 1).startswith("https://www.work.ua/jobs-remote/?")
+        assert "deferment=1" in work_search_url("python", 2)
+        assert "page=2" in work_search_url("python", 2)
+
+        warehouse = {
+            "href": "/jobs/1/",
+            "title": "Водій навантажувача",
+            "company": "Klion group",
+            "lines": ["Дистанційно"],
+            "published": "",
+            "salary": "",
+            "snippet": "",
+            "reserved": True,
+        }
+        coder = {
+            "href": "/jobs/1059007/",
+            "title": "Програміст 1C",
+            "company": "Klion group",
+            "lines": ["Дистанційно"],
+            "published": "",
+            "salary": "",
+            "snippet": "",
+            "reserved": True,
+        }
+
+        class FakeBrowser:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def goto(self, url, selector=None) -> None:
+                pass
+
+            def evaluate(self, _script):
+                self.calls += 1
+                if self.calls == 1:
+                    return [warehouse]
+                if self.calls == 2:
+                    return [coder]
+                return []
+
+        listing = fetch_workua(FakeBrowser(), "", pages=5)
+        assert [job.job_id for job in listing.jobs] == ["1059007"]
 
     def test_robota_requires_remote_schedule(self):
         job = job_from_item(
@@ -281,6 +374,30 @@ class TestParsers:
             }
         )
         assert office is None
+        assert (
+            job_from_item(
+                {
+                    "id": 9,
+                    "title": "Водій навантажувача",
+                    "schedules": [{"name": "remote"}],
+                    "company": {"id": 1, "name": "Klion"},
+                    "badges": [{"name": "Бронирование сотрудников"}],
+                }
+            )
+            is None
+        )
+        assert (
+            job_from_item(
+                {
+                    "id": 10,
+                    "title": "Інженер-програміст 1С",
+                    "schedules": [{"name": "remote"}],
+                    "company": {"id": 1, "name": "Klion"},
+                    "badges": [{"name": "Бронирование сотрудников"}],
+                }
+            )
+            is not None
+        )
 
     def test_jooble_keeps_a_card_only_when_the_text_states_reservation(self):
         kept = jooble_job(
@@ -316,6 +433,16 @@ class TestParsers:
         assert tagged is not None
         assert tagged.evidence == "Бронювання"
         assert tagged.company == "OM Defence Systems"
+        assert (
+            jooble_job(
+                {
+                    "title": "Водій навантажувача",
+                    "href": "https://ua.jooble.org/desc/99",
+                    "text": "Водій навантажувача\nВіддалено\nБронювання працівників",
+                }
+            )
+            is None
+        )
         assert tagged.location == "Віддалено"
         noisy = jooble_job(
             {

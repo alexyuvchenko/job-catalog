@@ -114,7 +114,10 @@ class TestService:
         assert health.json()["running"]
         assert client.get("/api/status").json()["active"] == 1
         assert health.headers["x-content-type-options"] == "nosniff"
-        policy = client.get("/").headers["content-security-policy"]
+        page = client.get("/")
+        policy = page.headers["content-security-policy"]
+        assert "https://www.work.ua/jobs-remote/?deferment=1" in page.text
+        assert "scheduleIds=3;isReservation=true" in page.text
         assert "frame-ancestors 'none'" in policy
         # The page polls /api/status, and default-src 'none' would block that.
         assert "connect-src 'self'" in policy

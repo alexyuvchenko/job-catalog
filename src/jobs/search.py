@@ -174,7 +174,7 @@ def _skip(statuses: list[SourceStatus], names: list[str]) -> None:
 
 
 def _matches(job: Job, query: Query) -> bool:
-    if not is_it_role(job.title, job.category, query.focus):
+    if not is_it_role(job.title, "", query.focus):
         return False
     if not accept_remote(job.remote, query.full_remote_only):
         return False

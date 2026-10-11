@@ -22,12 +22,12 @@ MANUAL_LINKS = (
     ),
     (
         "Work.ua",
-        "https://www.work.ua/jobs-remote-industry-it/?deferment=1",
+        "https://www.work.ua/jobs-remote/?deferment=1",
         "link_workua",
     ),
     (
         "Robota.ua",
-        "https://robota.ua/zapros/ukraine/params;rubrics=1",
+        "https://robota.ua/zapros/ukraine/params;scheduleIds=3;isReservation=true",
         "link_robota",
     ),
     (

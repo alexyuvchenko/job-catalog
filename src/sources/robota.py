@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from core.classify import evidence_sentence, parse_relative_date, parse_salary
+from core.classify import evidence_sentence, is_it_title, parse_relative_date, parse_salary
 from core.models import Job, Listing
 from network.browser import Browser
 from network.client import FetchError
@@ -49,16 +49,14 @@ _FETCH = """async ({ query, variables }) => {
 
 
 def fetch_jobs(browser: Browser, keyword: str, pages: int) -> Listing:
-    browser.goto("https://robota.ua/zapros/ukraine/params;rubrics=1")
+    browser.goto("https://robota.ua/zapros/ukraine/params;scheduleIds=3;isReservation=true")
     found: list[Job] = []
     seen: set[str] = set()
     total = None
     stopped = False
     for page in range(pages):
         try:
-            payload = _search(browser, keyword, page, with_it_rubric=True)
-            if payload is None:
-                payload = _search(browser, keyword, page, with_it_rubric=False)
+            payload = _search(browser, keyword, page)
         except FetchError:
             if page == 0:
                 raise
@@ -69,22 +67,24 @@ def fetch_jobs(browser: Browser, keyword: str, pages: int) -> Listing:
         block = (payload.get("data") or {}).get("publishedVacancies") or {}
         if total is None:
             total = block.get("totalCount")
-        fresh = []
+        progressed = False
         for item in block.get("items") or []:
-            job = job_from_item(item)
-            if job is None or job.job_id in seen:
+            job_id = str(item.get("id") or "")
+            if not job_id or job_id in seen:
                 continue
-            seen.add(job.job_id)
-            fresh.append(job)
-        if not fresh:
+            seen.add(job_id)
+            progressed = True
+            job = job_from_item(item)
+            if job is not None:
+                found.append(job)
+        if not progressed:
             break
-        found.extend(fresh)
-        if total is not None and len(found) >= int(total):
+        if total is not None and len(seen) >= int(total):
             break
     if total is not None:
-        message = f"прочитано {len(found)} із близько {total} віддалених вакансій із бронюванням"
+        message = f"прочитано {len(found)} IT-вакансій із близько {total} віддалених із бронюванням"
     else:
-        message = f"прочитано {len(found)} віддалених вакансій із бронюванням"
+        message = f"прочитано {len(found)} віддалених IT-вакансій із бронюванням"
     if stopped:
         message += (
             "; наступні сторінки не відкрились, тож попередні вакансії Robota.ua не знімаються"
@@ -95,7 +95,7 @@ def fetch_jobs(browser: Browser, keyword: str, pages: int) -> Listing:
 def job_from_item(item: dict) -> Job | None:
     job_id = str(item.get("id") or "")
     title = (item.get("title") or "").strip()
-    if not job_id or not title:
+    if not job_id or not title or not is_it_title(title):
         return None
     schedules = [str((row or {}).get("name") or "") for row in item.get("schedules") or []]
     if "remote" not in schedules:
@@ -141,12 +141,10 @@ def job_from_item(item: dict) -> Job | None:
     )
 
 
-def _search(browser: Browser, keyword: str, page: int, with_it_rubric: bool) -> dict | None:
+def _search(browser: Browser, keyword: str, page: int) -> dict | None:
     vacancy_filter: dict = {"scheduleIds": ["3"], "isReservation": True}
     if keyword.strip():
         vacancy_filter["keywords"] = keyword.strip()
-    if with_it_rubric:
-        vacancy_filter["rubrics"] = [{"id": "1", "subrubricIds": []}]
     assert browser.page is not None
     raw = browser.page.evaluate(
         _FETCH,
@@ -163,8 +161,6 @@ def _search(browser: Browser, keyword: str, page: int, with_it_rubric: bool) -> 
         payload = json.loads(raw)
     except json.JSONDecodeError as exc:
         raise FetchError("Robota.ua returned a non-JSON response") from exc
-    if payload.get("errors") and with_it_rubric:
-        return None
     if payload.get("errors"):
         message = payload["errors"][0].get("message", "GraphQL error")
         raise FetchError(message)

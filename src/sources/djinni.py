@@ -7,6 +7,7 @@ from html import unescape
 
 from core.classify import (
     evidence_sentence,
+    is_it_title,
     parse_english,
     parse_salary,
     parse_years,
@@ -54,15 +55,15 @@ def fetch_jobs(client: Client, keyword: str, pages: int) -> Listing:
         if not fresh:
             break
         seen_ids.update(job.job_id for job in fresh)
-        found.extend(fresh)
-        if total is not None and len(found) >= total:
+        found.extend(job for job in fresh if is_it_title(job.title))
+        if total is not None and len(seen_ids) >= total:
             break
         if len(jobs) < 10:
             break
     if total is not None:
-        message = f"прочитано {len(found)} із близько {total} віддалених вакансій із бронюванням"
+        message = f"прочитано {len(found)} IT-вакансій із близько {total} віддалених із бронюванням"
     else:
-        message = f"прочитано {len(found)} віддалених вакансій із бронюванням"
+        message = f"прочитано {len(found)} віддалених IT-вакансій із бронюванням"
     if stopped:
         message += "; наступні сторінки не відкрились, тож попередні вакансії Djinni не знімаються"
     return Listing(found, message, complete=not stopped)

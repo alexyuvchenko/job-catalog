@@ -186,24 +186,24 @@ _TEXT: dict[str, dict[str, str]] = {
     # Footer
     "manual_title": {"uk": "Перевірити джерела вручну", "en": "Check the sources by hand"},
     "link_djinni": {
-        "uk": "офіційний фільтр «Бронювання» і віддалена робота",
-        "en": "the official “Бронювання” filter plus remote work",
+        "uk": "офіційний фільтр «Бронювання» і віддалена робота; у списку лишаються IT-посади",
+        "en": "the official “Бронювання” filter plus remote work; the list keeps IT roles",
     },
     "link_dou": {
-        "uk": "віддалені вакансії за запитом «бронювання»",
-        "en": "remote jobs for the query “бронювання”",
+        "uk": "віддалені вакансії з офіційним бейджем «бронювання»; у списку лишаються IT-посади",
+        "en": "remote jobs with the official бронювання badge; the list keeps IT roles",
     },
     "link_workua": {
-        "uk": "віддалені IT-вакансії з фільтром «Бронювання працівників»",
-        "en": "remote IT jobs with the “Бронювання працівників” filter",
+        "uk": "віддалені вакансії з фільтром «Бронювання працівників»; у списку лишаються IT-посади з будь-якої сфери",
+        "en": "remote jobs with the “Бронювання працівників” filter; the list keeps IT roles from any industry",
     },
     "link_robota": {
-        "uk": "IT-вакансії; скрипт залишає віддалені з позначкою бронювання",
-        "en": "IT jobs; the script keeps remote ones marked as reservation",
+        "uk": "віддалені вакансії з позначкою бронювання; у списку лишаються IT-посади з будь-якої сфери",
+        "en": "remote jobs marked as reservation; the list keeps IT roles from any industry",
     },
     "link_jooble": {
-        "uk": "віддалені вакансії; у списку лишаються ті, де в тексті є бронювання",
-        "en": "remote jobs; only those that state reservation in the text are kept",
+        "uk": "віддалені вакансії; у списку лишаються IT-посади, де в тексті є бронювання",
+        "en": "remote jobs; the list keeps IT roles that state reservation in the text",
     },
     "note_catalog": {
         "uk": "Бронювання — це заява роботодавця, що посаду можна включити в бронювання військовозобов’язаних працівників. Це не автоматична відстрочка: потрібні актуальні військово-облікові документи, а рішення залежить від статусу компанії і чинного порядку. Умови варто підтвердити на співбесіді. Вакансія зникає з активного списку, коли її більше немає у джерелі під час чергового оновлення. Якщо сайт не відповів, попередні вакансії цього джерела залишаються. Work.ua і Robota.ua відкриваються через Chrome поза екраном. Jooble зараз не читається.",

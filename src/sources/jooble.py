@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 import urllib.parse
 
-from core.classify import evidence_sentence, parse_relative_date, parse_salary
+from core.classify import evidence_sentence, is_it_title, parse_relative_date, parse_salary
 from core.models import Job, Listing
 from network.browser import Browser
 from network.client import FetchError
@@ -65,6 +65,9 @@ def job_from_card(card: dict) -> Job | None:
     evidence = _reservation_evidence(text)
     if not evidence:
         return None
+    title = card.get("title") or ""
+    if not is_it_title(title):
+        return None
     href = card.get("href") or ""
     match = re.search(r"/(?:desc|jdp)/(-?\d+)", href)
     if not match:
@@ -83,7 +86,7 @@ def job_from_card(card: dict) -> Job | None:
     return Job(
         source="Jooble",
         job_id=match.group(1),
-        title=card.get("title") or "",
+        title=title,
         company=company,
         company_url="",
         url=f"https://ua.jooble.org/desc/{match.group(1)}",

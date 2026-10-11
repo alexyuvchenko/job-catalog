@@ -31,7 +31,7 @@ Run ruff and the tests after every substantive change. Live fetches, Chrome, and
 ## Rules to keep
 
 - **Reservation wording.** бронювання is an employer statement, not an automatic deferment. UI and README must say current military-registration documents are required and the terms are confirmed in the interview.
-- **Sources.** The Djinni reservation + remote filter is the confirmed source. DOU is kept only with the official badge (`search=бронювання` and `from=badge`). Default focus is engineering and product IT.
+- **Sources.** The Djinni reservation + remote filter is the confirmed source. DOU is kept only with the official badge (`search=бронювання` and `from=badge`). Work.ua uses remote + `deferment=1`. Robota.ua uses remote + `isReservation`. None of them is limited to an IT industry/rubric; after the official reservation mark, only engineering/IT titles are kept. Default focus is engineering and product IT.
 - **No Cloudflare-bypass toolkit.** Chrome is used only because some sites refuse plain requests. When a site asks "verify you are human", wait for the person in an attended run, and fail fast in scheduled runs.
 - **Catalog merge.** Merge by URL. A failed or incomplete source never deactivates its old rows, and neither does a source that returned no jobs. "New", "changed" and "closed" mean what the latest successful refresh did, so they need at least two successful refreshes. Tracked fields are in `TRACKED_FIELDS`. Dates and snippets are deliberately not compared.
 - **Marks.** `set_marks` takes the write lock first (`BEGIN IMMEDIATE`) so quick clicks cannot overwrite each other. Marking "not for me" clears favorite, and the reverse.
