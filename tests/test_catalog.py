@@ -79,6 +79,7 @@ class TestCatalog:
                 items=[], total=0, page=1, per_page=50, filters=CatalogFilters(), language="en"
             )
         )
+        assert 'href="/favicon.svg"' in page
         assert page.count('aria-sort="descending"') == 1
         assert "sort=date&amp;dir=asc" in page
         assert "sort=company&amp;dir=asc" in page

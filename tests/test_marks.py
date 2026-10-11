@@ -308,6 +308,7 @@ class TestRender:
             assert title in page
             assert 'data-act="favorite"' not in page
             assert 'class="static"' in page
+            assert "data:image/svg+xml," in page
 
 
 def _placeholders(text: str) -> set[str]:

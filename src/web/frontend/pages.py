@@ -19,6 +19,7 @@ from storage.filters import (
     default_descending,
 )
 from storage.records import StoredJob
+from web.frontend.assets.favicon import FAVICON_LINK
 from web.frontend.assets.script import CATALOG_JS
 from web.frontend.assets.styles import CSS
 from web.frontend.catalog_rows import render_rows
@@ -125,6 +126,7 @@ def render_catalog(view: CatalogView) -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{escape(t("title"))}</title>
+  {FAVICON_LINK}
   <style>{CSS}</style>
 </head>
 <body data-refreshing="{"1" if view.running else "0"}" data-shows-hidden="{shows_hidden}">
@@ -432,6 +434,7 @@ def render_error(language: str) -> str:
 <head>
   <meta charset="utf-8">
   <title>{t("error_title")}</title>
+  {FAVICON_LINK}
 </head>
 <body>
   <p>{t("error_body")}</p>

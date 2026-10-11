@@ -12,6 +12,7 @@ from core.paths import OUT_DIR
 from jobs.search import Query
 from storage.group import group_same_positions
 from storage.records import StoredJob
+from web.frontend.assets.favicon import FAVICON_DATA_LINK
 from web.frontend.assets.styles import CSS
 from web.frontend.catalog_rows import render_rows
 from web.frontend.components import manual_links, source_chips
@@ -91,6 +92,7 @@ def render_page(jobs: list[Job], statuses: list[SourceStatus], language: str = "
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{escape(t("title"))}</title>
+  {FAVICON_DATA_LINK}
   <style>{CSS}</style>
 </head>
 <body>

@@ -107,6 +107,11 @@ class TestService:
             raise RuntimeError("secret /tmp/catalog.sqlite")
 
         client = TestClient(app, base_url="http://127.0.0.1", raise_server_exceptions=False)
+        icon = client.get("/favicon.svg")
+        assert icon.status_code == 200
+        assert icon.headers["content-type"].startswith("image/svg+xml")
+        assert "#0d6b52" in icon.text
+        assert client.get("/favicon.ico").status_code == 200
         sign_in(client, catalog)
         health = client.get("/health")
         assert health.status_code == 200
@@ -121,6 +126,8 @@ class TestService:
         assert "https://www.work.ua/jobs-remote/?deferment=1" in page.text
         assert "scheduleIds=3;isReservation=true" in page.text
         assert "frame-ancestors 'none'" in policy
+        assert "img-src 'self'" in policy
+        assert 'href="/favicon.svg"' in page.text
         # The page polls /api/status, and default-src 'none' would block that.
         assert "connect-src 'self'" in policy
 

@@ -19,7 +19,8 @@ PAGE_HEADERS = {
     "Cache-Control": "no-store",
     "Content-Security-Policy": (
         "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; "
-        "connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+        "img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; "
+        "frame-ancestors 'none'"
     ),
 }
 _SECURITY_HEADERS = {

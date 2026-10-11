@@ -6,7 +6,7 @@ import logging
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from jobs.refresh import CatalogService
 from storage.catalog import Catalog
@@ -23,6 +23,7 @@ from web.catalog.dependencies import (
 from web.catalog.schemas import MarksUpdate
 from web.catalog.view import catalog_view
 from web.frontend import i18n
+from web.frontend.assets.favicon import FAVICON_SVG
 from web.frontend.catalog_rows import render_rows
 from web.frontend.pages import filter_params, render_catalog
 from web.language import page_language, stick_language
@@ -31,6 +32,7 @@ from web.security import PAGE_HEADERS, is_local_client, same_origin
 log = logging.getLogger("jobsearch")
 
 router = APIRouter()
+_FAVICON_HEADERS = {"Cache-Control": "public, max-age=86400"}
 
 
 def _can_refresh(request: Request) -> bool:
@@ -49,6 +51,12 @@ def _catalog_location(filters: CatalogFilters, per_page: int, page: int, lang: s
 
 def _current_location(request: Request) -> str:
     return "/" if not request.url.query else "/?" + request.url.query
+
+
+@router.get("/favicon.svg")
+@router.get("/favicon.ico")
+def favicon() -> Response:
+    return Response(FAVICON_SVG, media_type="image/svg+xml", headers=_FAVICON_HEADERS)
 
 
 @router.get("/", response_class=HTMLResponse, response_model=None)

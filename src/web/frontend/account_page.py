@@ -5,6 +5,7 @@ from __future__ import annotations
 from html import escape
 from urllib.parse import urlencode
 
+from web.frontend.assets.favicon import FAVICON_LINK
 from web.frontend.assets.styles import CSS
 from web.frontend.i18n import LANGUAGES, translator
 
@@ -54,6 +55,7 @@ def render_auth(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{escape(title)}</title>
+  {FAVICON_LINK}
   <style>{CSS}</style>
 </head>
 <body class="auth-page">
