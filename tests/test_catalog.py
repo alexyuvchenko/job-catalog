@@ -8,7 +8,7 @@ from jobsearch.db.catalog import Catalog, CatalogFilters
 from jobsearch.models import Job, SourceStatus
 from jobsearch.service import CatalogService
 from jobsearch.web.pages import CatalogView, render_catalog
-from jobsearch.web.server import create_app
+from jobsearch.web.server import create_app, read_filters
 
 
 class CatalogTests(unittest.TestCase):
@@ -29,6 +29,90 @@ class CatalogTests(unittest.TestCase):
             self.assertEqual(titles(sort="job", descending=True), ["b", "A"])
             self.assertEqual(titles(sort="company"), ["A", "b"])
             self.assertEqual(titles(sort="company", descending=True), ["b", "A"])
+
+    def test_date_sort_direction_blanks_and_ukrainian_names(self):
+        with tempfile.TemporaryDirectory() as folder:
+            catalog = Catalog(Path(folder) / "catalog.sqlite")
+            jobs = [
+                _job(url="https://example.com/1", job_id="1", title="Old", published="2026-10-01"),
+                _job(
+                    url="https://example.com/2",
+                    job_id="2",
+                    title="New",
+                    company="Ялина",
+                    published="2026-10-09",
+                    salary_max=1000,
+                ),
+                _job(
+                    url="https://example.com/3",
+                    job_id="3",
+                    title="New",
+                    company="Ідея",
+                    published="2026-10-09",
+                    salary_max=5000,
+                ),
+                _job(url="https://example.com/4", job_id="4", title="Undated", published=""),
+            ]
+            catalog.merge(
+                jobs,
+                [SourceStatus("Djinni", True, "ok", fetched=4, kept=4)],
+                "2026-10-10 10:00:00",
+                "2026-10-10 10:01:00",
+            )
+
+            def titles(**kwargs):
+                return [item.job.title for item in catalog.list_jobs(CatalogFilters(**kwargs))]
+
+            def companies(**kwargs):
+                return [item.job.company for item in catalog.list_jobs(CatalogFilters(**kwargs))]
+
+            # Same day keeps the query order: higher salary first. A blank date stays last.
+            self.assertEqual(companies(), ["Ідея", "Ялина", "Example", "Example"])
+            self.assertEqual(
+                titles(sort="date", descending=False), ["Old", "New", "New", "Undated"]
+            )
+            self.assertEqual(
+                companies(sort="", descending=False), ["Example", "Ідея", "Ялина", "Example"]
+            )
+            # Equal titles keep the newer-first order the query already produced.
+            self.assertEqual(companies(sort="job"), ["Ідея", "Ялина", "Example", "Example"])
+            # "і" sorts before "я", and a Latin name sorts before either.
+            self.assertEqual(companies(sort="company"), ["Example", "Example", "Ідея", "Ялина"])
+
+    def test_sort_headers_follow_the_active_column(self):
+        page = render_catalog(
+            CatalogView(
+                items=[], total=0, page=1, per_page=50, filters=CatalogFilters(), language="en"
+            )
+        )
+        self.assertEqual(page.count('aria-sort="descending"'), 1)
+        self.assertIn("sort=date&amp;dir=asc", page)
+        self.assertIn("sort=company&amp;dir=asc", page)
+        self.assertNotIn('aria-sort="ascending"', page)
+
+        company = render_catalog(
+            CatalogView(
+                items=[],
+                total=0,
+                page=1,
+                per_page=50,
+                filters=CatalogFilters(sort="company", descending=False),
+                language="en",
+            )
+        )
+        self.assertEqual(company.count('aria-sort="ascending"'), 1)
+        self.assertNotIn('aria-sort="descending"', company)
+        self.assertIn("sort=company&amp;dir=desc", company)
+        self.assertIn('name="sort" value="company"', company)
+        self.assertIn('name="dir" value="asc"', company)
+
+    def test_sort_query_is_normalized(self):
+        chosen = read_filters(sort=" JOB ", dir="DESC")
+        self.assertEqual((chosen.sort, chosen.descending), ("job", True))
+        omitted = read_filters(dir="asc")
+        self.assertEqual((omitted.sort, omitted.descending), ("", False))
+        unknown = read_filters(sort="salary", dir="sideways")
+        self.assertEqual((unknown.sort, unknown.descending), ("", None))
 
     def test_merge_updates_keeps_failures_and_marks_only_new_rows(self):
         with tempfile.TemporaryDirectory() as folder:

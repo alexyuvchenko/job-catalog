@@ -15,6 +15,7 @@ from jobsearch.db.catalog import (
     MINE_CHOICES,
     CatalogFilters,
     StoredJob,
+    active_sort,
     default_descending,
 )
 from jobsearch.models import SourceStatus
@@ -173,10 +174,7 @@ def render_catalog(view: CatalogView) -> str:
 def _sort_header(view: CatalogView, t: Translator, column: str) -> str:
     """A column title that sorts by that column; a second click reverses the order."""
     filters = view.filters
-    current = filters.sort or "date"
-    descending = (
-        default_descending(filters.sort) if filters.descending is None else filters.descending
-    )
+    current, descending = active_sort(filters)
     active = current == column
     next_desc = not descending if active else default_descending(column)
     params = [

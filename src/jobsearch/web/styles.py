@@ -120,8 +120,7 @@ CSS = """
       font-size: 0.78rem; letter-spacing: 0.03em; text-transform: uppercase; color: var(--muted);
       background: var(--card);
     }
-    th a.sort { color: inherit; text-decoration: none; white-space: nowrap; }
-    th a.sort { cursor: pointer; }
+    th a.sort { color: inherit; text-decoration: none; white-space: nowrap; cursor: pointer; }
     th a.sort:hover { text-decoration: underline; }
     th a.sort .idle { opacity: 0.45; }
     th[aria-sort] a.sort { color: var(--green); }
@@ -249,8 +248,21 @@ CSS = """
       .toolbar { flex-direction: column; align-items: stretch; gap: 8px; }
       #filter { max-width: none; width: 100%; }
       .table-wrap { border: 0; background: none; border-radius: 0; overflow: visible; }
-      table, tbody { display: block; background: none; }
-      thead { display: none; }
+      table, thead, tbody { display: block; background: none; }
+      thead { margin-bottom: 10px; }
+      thead tr { display: flex; flex-wrap: wrap; gap: 8px; }
+      thead th {
+        display: none; position: static; padding: 0; border: 0; background: none;
+        text-transform: none; letter-spacing: 0;
+      }
+      thead th:has(a.sort) { display: block; }
+      th a.sort {
+        display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px;
+        border: 1px solid var(--line); border-radius: 999px; background: var(--card);
+        font-size: 0.92rem;
+      }
+      th[aria-sort] a.sort { border-color: var(--green); background: var(--green-soft); }
+      table.static thead { display: none; }
       tbody tr {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;

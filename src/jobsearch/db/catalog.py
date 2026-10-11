@@ -55,11 +55,53 @@ class CatalogFilters:
     descending: bool | None = None
 
 
-SORT_CHOICES = ("", "date", "job", "company")
+SORT_COLUMNS = ("date", "job", "company")
+SORT_CHOICES = ("", *SORT_COLUMNS)
+
+# casefold() is not Ukrainian alphabetical order: "і" would sort after "я".
+_UKRAINIAN_ALPHABET = "абвгґдеєжзиіїйклмнопрстуфхцчшщьюя"
+_UKRAINIAN_ORDER = {letter: chr(0x0430 + index) for index, letter in enumerate(_UKRAINIAN_ALPHABET)}
 
 
-def default_descending(sort: str) -> bool:
-    return sort in ("", "date")
+def default_descending(column: str) -> bool:
+    """Date starts with the newest vacancy. A name starts at the beginning of the alphabet."""
+    return column in ("", "date")
+
+
+def active_sort(filters: CatalogFilters) -> tuple[str, bool]:
+    """The column and direction the list is actually ordered by.
+
+    An empty column means the date. A direction still applies when the column
+    was left out, so ``?dir=asc`` orders that default upwards.
+    """
+    column = filters.sort if filters.sort in SORT_COLUMNS else "date"
+    if filters.descending is None:
+        return column, default_descending(column)
+    return column, filters.descending
+
+
+def _label_key(value: str) -> str:
+    folded = value.casefold()
+    return "".join(_UKRAINIAN_ORDER.get(character, character) for character in folded)
+
+
+def _apply_sort(found: list[StoredJob], filters: CatalogFilters) -> None:
+    """Order ``found`` in place.
+
+    The rows already arrive newest first, then by salary, then by title. This
+    sort is stable, so equal names keep that order. A missing date is neither
+    newer nor older, so it stays after vacancies that have one.
+    """
+    column, descending = active_sort(filters)
+    if column == "date":
+        found.sort(key=lambda item: item.job.published, reverse=descending)
+        if not descending:
+            dated = [item for item in found if item.job.published]
+            blank = [item for item in found if not item.job.published]
+            found[:] = dated + blank
+        return
+    attribute = "title" if column == "job" else "company"
+    found.sort(key=lambda item: _label_key(getattr(item.job, attribute)), reverse=descending)
 
 
 @dataclass
@@ -209,18 +251,7 @@ class Catalog:
             stored = _stored(row, cutoff)
             if _visible(stored, filters):
                 found.append(stored)
-        if filters.sort:
-            descending = (
-                default_descending(filters.sort)
-                if filters.descending is None
-                else filters.descending
-            )
-            keys = {
-                "date": lambda s: s.job.published,
-                "job": lambda s: s.job.title.casefold(),
-                "company": lambda s: s.job.company.casefold(),
-            }
-            found.sort(key=keys[filters.sort], reverse=descending)
+        _apply_sort(found, filters)
         return found
 
     def set_marks(

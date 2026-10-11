@@ -416,6 +416,8 @@ def read_filters(
     level = english.strip().upper()
     chosen = source.strip()
     rating = _int(min_rating)
+    column = sort.strip().lower()
+    direction = dir.strip().lower()
     return CatalogFilters(
         text=q.strip()[:80],
         source=chosen if chosen in _SOURCES else "",
@@ -428,8 +430,8 @@ def read_filters(
         min_rating=rating if rating is not None and 1 <= rating <= MAX_RATING else None,
         change=change if change in CHANGE_CHOICES else "",
         language=language if language in LANGUAGE_CHOICES else "",
-        sort=sort if sort in SORT_CHOICES else "",
-        descending={"asc": False, "desc": True}.get(dir),
+        sort=column if column in SORT_CHOICES else "",
+        descending={"asc": False, "desc": True}.get(direction),
     )
 
 

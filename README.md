@@ -133,6 +133,8 @@ Besides the text, source, salary, English, experience, and remote filters, you c
 
 Filters apply when you change a select or press «Застосувати». On a phone the filters and the legend start folded, with the number of active filters in the title. The list shows 25, 50 (default), 100, or 200 rows per page. Use the page links, or press «Показати ще» to add the next rows under the current ones without reloading.
 
+The date, job, and company headings sort the list. Date starts with the newest vacancy, and a job or company name starts at the beginning of the alphabet; click the same heading again to reverse it. A vacancy with no date stays at the end. On a phone those headings are buttons above the cards. Sorting stays in place when you filter or turn the page. «Скинути» clears it.
+
 ### Open it on a phone
 
 Start the service so it listens on the network, and keep the computer awake and on the same Wi-Fi as the phone:
@@ -156,7 +158,7 @@ Ctrl+C finishes the site already in progress, closes Chrome, and saves the sites
 | `GET /` | The catalog page. |
 | `GET /health` | Whether a refresh is running, stored counts, the last finish time, and the last error. `GET /api/status` is the same. It answers 503 when the database cannot be read. |
 | `GET /?page=2&per_page=100` | A page of the list. `per_page` is 25, 50, 100, or 200. Other values fall back to the default. |
-| `GET /api/jobs` | The filtered list as JSON, not paged. It adds `active`, `change`, `changes`, `language`, `favorite`, `hidden`, `rating`, and `viewed` to each vacancy. Query parameters match the page: `q`, `source`, `min_salary`, `english`, `min_years`, `full_remote_only`, `include_inactive`, `mine` (`all`, `favorites`, `unviewed`, `viewed`, `rated`, `hidden`), `min_rating`, `change` (`added`, `changed`, `closed`), `language` (`en`, `uk`). |
+| `GET /api/jobs` | The filtered list as JSON, not paged. It adds `active`, `change`, `changes`, `language`, `favorite`, `hidden`, `rating`, and `viewed` to each vacancy. Query parameters match the page: `q`, `source`, `min_salary`, `english`, `min_years`, `full_remote_only`, `include_inactive`, `mine` (`all`, `favorites`, `unviewed`, `viewed`, `rated`, `hidden`), `min_rating`, `change` (`added`, `changed`, `closed`), `language` (`en`, `uk`), `sort` (`date`, `job`, `company`), `dir` (`asc`, `desc`). |
 | `POST /api/jobs/state` | Saves your marks. JSON body: `url` and any of `favorite`, `hidden`, `rating` (0 to 5), `viewed`. Omitted fields stay as they are. Answers with the stored marks, or 404 for an unknown vacancy. Only accepted from the page's own origin. |
 | `GET /fragments/rows` | The next rows as JSON for «Показати ще». Takes the same query as the page. |
 | `GET /docs` | Interactive API docs. |
