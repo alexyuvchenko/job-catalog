@@ -45,6 +45,7 @@ class TestAccounts:
         with pytest.raises(AccountError):
             catalog.create_user("ada", "password-2")
         ben = catalog.create_user("ben", "password-2")
+        assert catalog.user_count() == 2
         catalog.set_marks(_job().url, ada.id, favorite=True, rating=5, hidden=False)
         ada_seen = catalog.list_jobs(CatalogFilters(mine="favorites"), ada.id)
         ben_seen = catalog.list_jobs(CatalogFilters(mine="favorites"), ben.id)

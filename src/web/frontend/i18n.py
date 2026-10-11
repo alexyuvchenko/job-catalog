@@ -55,6 +55,7 @@ _TEXT: dict[str, dict[str, str]] = {
         "en": "{active} active in the catalog{closed}.",
     },
     "in_catalog_closed": {"uk": ", знятих {n}", "en": ", {n} closed"},
+    "users_count": {"uk": "Користувачів: {n}.", "en": "{n} users."},
     # Filters
     "filters": {"uk": "Фільтри", "en": "Filters"},
     "filters_active": {"uk": "активних: {n}", "en": "{n} active"},

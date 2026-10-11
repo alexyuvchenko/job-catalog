@@ -143,6 +143,7 @@ class TestCatalog:
         active = catalog.list_jobs(CatalogFilters(text="qa"))
         assert [item.job.title for item in active] == ["QA Engineer"]
         assert catalog.counts() == (2, 1)
+        assert catalog.user_count() == 0
 
         extra = _job(url="https://example.com/4", job_id="4", title="Data Engineer")
         partial = SourceStatus(
@@ -159,10 +160,17 @@ class TestCatalog:
     def test_catalog_page_lists_a_stored_job(self):
         page = render_catalog(
             CatalogView(
-                items=[], total=0, page=1, per_page=50, filters=CatalogFilters(), running=True
+                items=[],
+                total=0,
+                page=1,
+                per_page=50,
+                filters=CatalogFilters(),
+                running=True,
+                user_count=2,
             )
         )
         assert "Каталог ще порожній" in page
+        assert "Користувачів: 2." in page
         assert 'data-refreshing="1"' in page
         assert "http-equiv" not in page
 
@@ -187,6 +195,7 @@ class TestCatalog:
         assert page.status_code == 200
         assert "Python Developer" in page.text
         assert "Go Engineer" in page.text
+        assert "Користувачів: 1." in page.text
         listed = client.get("/api/jobs", params={"q": "python"}).json()
         assert [item["title"] for item in listed] == ["Python Developer"]
         refresh = client.post("/refresh", follow_redirects=False)

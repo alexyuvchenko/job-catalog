@@ -49,6 +49,7 @@ class CatalogView:
     statuses: list[SourceStatus] = field(default_factory=list)
     active_count: int = 0
     inactive_count: int = 0
+    user_count: int = 0
     new_count: int = 0
     running: bool = False
     last_finished: str = ""
@@ -211,7 +212,10 @@ def _statusline(view: CatalogView, t: Translator) -> str:
         if view.next_run and not view.running:
             progress += f" {escape(t('next_refresh', when=view.next_run))}"
     closed = t("in_catalog_closed", n=view.inactive_count) if view.inactive_count else ""
-    return f"{progress} {escape(t('in_catalog', active=view.active_count, closed=closed))}"
+    return (
+        f"{progress} {escape(t('in_catalog', active=view.active_count, closed=closed))} "
+        f"{escape(t('users_count', n=view.user_count))}"
+    )
 
 
 def _stat(view: CatalogView, text: str, count: int, change: str) -> str:

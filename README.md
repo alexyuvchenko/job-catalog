@@ -184,7 +184,7 @@ The catalog, marks, filters, and refresh require a signed-in session. Pages redi
 | `GET /register`, `POST /register` | Create an account and sign in. |
 | `POST /logout` | End this browser’s session. |
 | `GET /` | The catalog page. Without a session, this redirects to `/login`. With a session and no filter query, it opens the account’s saved filters. `/?reset=1` clears them. |
-| `GET /health` | Whether a refresh is running, stored counts, the last finish time, and the last error. `GET /api/status` is the same. It answers 503 when the database cannot be read. |
+| `GET /health` | Whether a refresh is running, stored job and account counts, the last finish time, and the last error. `GET /api/status` is the same. It answers 503 when the database cannot be read. |
 | `GET /?page=2&per_page=100` | A page of the list. `per_page` is 25, 50, 100, or 200. Other values fall back to the default. |
 | `GET /api/jobs` | The filtered list as JSON, not paged. It adds `active`, `change`, `changes`, `language`, `favorite`, `hidden`, `rating`, and `viewed` to each vacancy. Query parameters match the page: `q`, `source`, `min_salary`, `english`, `min_years`, `full_remote_only`, `include_inactive`, `mine` (`all`, `favorites`, `unviewed`, `viewed`, `rated`, `hidden`), `min_rating`, `change` (`added`, `changed`, `closed`), `language` (`en`, `uk`), `sort` (`date`, `job`, `company`), `dir` (`asc`, `desc`). |
 | `POST /api/jobs/state` | Saves your marks. JSON body: `url` and any of `favorite`, `hidden`, `rating` (0 to 5), `viewed`. Omitted fields stay as they are. Answers with the stored marks, or 404 for an unknown vacancy. Only accepted from the page's own origin. |

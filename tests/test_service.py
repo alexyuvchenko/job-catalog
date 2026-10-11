@@ -111,8 +111,10 @@ class TestService:
         health = client.get("/health")
         assert health.status_code == 200
         assert health.json()["active"] == 1
+        assert health.json()["users"] == 1
         assert health.json()["running"]
         assert client.get("/api/status").json()["active"] == 1
+        assert client.get("/api/status").json()["users"] == 1
         assert health.headers["x-content-type-options"] == "nosniff"
         page = client.get("/")
         policy = page.headers["content-security-policy"]

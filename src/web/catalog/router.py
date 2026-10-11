@@ -152,6 +152,7 @@ def health(request: Request):
     service: CatalogService = request.app.state.service
     try:
         active, inactive = catalog.counts()
+        users = catalog.user_count()
         _statuses, finished, _added, _updated, _deactivated = catalog.latest_statuses()
     except Exception:
         log.exception("health check failed")
@@ -161,6 +162,7 @@ def health(request: Request):
         "running": service.running,
         "active": active,
         "inactive": inactive,
+        "users": users,
         "last_finished": finished,
         "next_run": service.next_run,
         "last_error": service.last_error,

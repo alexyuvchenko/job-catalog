@@ -32,6 +32,7 @@ def catalog_view(
         statuses=statuses,
         active_count=active_count,
         inactive_count=inactive_count,
+        user_count=catalog.user_count(),
         new_count=sum(1 for item in stored if item.active and item.change == "added"),
         running=service.running,
         last_finished=finished,

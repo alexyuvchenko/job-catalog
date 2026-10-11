@@ -353,6 +353,10 @@ class Catalog:
             ]
         return active, inactive
 
+    def user_count(self) -> int:
+        with self._session() as connection:
+            return connection.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+
     def latest_statuses(self) -> tuple[list[SourceStatus], str, int, int, int]:
         with self._session() as connection:
             refresh = connection.execute(
