@@ -56,7 +56,7 @@ def render_auth(
   <title>{escape(title)}</title>
   <style>{CSS}</style>
 </head>
-<body>
+<body class="auth-page">
 <main>
   <div class="topbar">
     <h1>{escape(title)}</h1>

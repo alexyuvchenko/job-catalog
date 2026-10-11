@@ -329,4 +329,24 @@ CSS = """
       button.star { width: 34px; height: 40px; font-size: 1.3rem; }
       .pager a { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
     }
+
+    /* Sign-in and registration sit in a narrow column in the middle of the page. */
+    .auth-page {
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .auth-page main {
+      width: 100%;
+      max-width: 28rem;
+      padding-top: 24px;
+      padding-bottom: 24px;
+    }
+    .auth-page .auth { max-width: none; }
+    .auth-page .lede, .auth-page .note { max-width: none; }
+    @media (max-width: 640px) {
+      .auth-page .topbar { flex-direction: row; align-items: flex-start; }
+    }
 """
