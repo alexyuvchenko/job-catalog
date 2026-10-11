@@ -189,6 +189,7 @@ def jobs(request: Request):
             "hidden": item.marks.hidden,
             "rating": item.marks.rating,
             "viewed": item.marks.viewed,
+            "listings": [{"source": source, "url": url} for source, url in item.listings],
         }
         for item in catalog.list_jobs(filters, user.id)
     ]

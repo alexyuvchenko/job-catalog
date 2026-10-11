@@ -8,6 +8,7 @@ from storage.filters import CatalogFilters
 from web.app import create_app
 from web.catalog.dependencies import read_filters
 from web.frontend.pages import CatalogView, render_catalog
+from web.frontend.report import render_page
 
 
 class TestCatalog:
@@ -173,6 +174,102 @@ class TestCatalog:
         assert "Користувачів: 2." in page
         assert 'data-refreshing="1"' in page
         assert "http-equiv" not in page
+
+    def test_same_title_and_company_on_two_boards_is_one_row(self, tmp_path):
+        catalog = Catalog(tmp_path / "catalog.sqlite")
+        djinni = SourceStatus("Djinni", True, "ok", fetched=1, kept=1)
+        workua = SourceStatus("Work.ua", True, "ok", fetched=1, kept=1)
+        catalog.merge(
+            [
+                _job(
+                    source="Djinni",
+                    url="https://djinni.co/jobs/1",
+                    job_id="1",
+                    title="Python Developer",
+                    company="Acme",
+                    published="2026-10-09",
+                ),
+                _job(
+                    source="Work.ua",
+                    url="https://www.work.ua/jobs/2/",
+                    job_id="2",
+                    title="python  developer",
+                    company="ACME",
+                    published="2026-10-08",
+                ),
+                _job(
+                    source="Djinni",
+                    url="https://djinni.co/jobs/3",
+                    job_id="3",
+                    title="Python Developer",
+                    company="Other",
+                ),
+            ],
+            [djinni, workua],
+            "2026-10-10 10:00:00",
+            "2026-10-10 10:01:00",
+        )
+        listed = catalog.list_jobs(CatalogFilters())
+        acme = next(item for item in listed if item.job.company == "Acme")
+        other = next(item for item in listed if item.job.company == "Other")
+        assert [source for source, _url in acme.listings] == ["Djinni", "Work.ua"]
+        assert other.listings == (("Djinni", "https://djinni.co/jobs/3"),)
+        assert len(listed) == 2
+
+        only_djinni = catalog.list_jobs(CatalogFilters(source="Djinni"))
+        assert {item.job.company for item in only_djinni} == {"Acme", "Other"}
+        acme_only = next(item for item in only_djinni if item.job.company == "Acme")
+        assert acme_only.listings == (("Djinni", "https://djinni.co/jobs/1"),)
+
+        user = catalog.create_user("ada", "password-1").id
+        catalog.set_marks("https://djinni.co/jobs/1", user, favorite=True, rating=3)
+        grouped = catalog.list_jobs(CatalogFilters(), user)
+        fav = next(item for item in grouped if item.job.company == "Acme")
+        assert fav.marks.favorite and fav.marks.rating == 3
+        work = next(
+            item
+            for item in catalog.list_jobs(CatalogFilters(source="Work.ua", mine="all"), user)
+            if item.job.company.casefold() == "acme"
+        )
+        assert work.marks.favorite and work.marks.rating == 3
+
+        page = render_catalog(
+            CatalogView(
+                items=[acme],
+                total=1,
+                page=1,
+                per_page=50,
+                filters=CatalogFilters(),
+                language="en",
+            )
+        )
+        assert page.count(">Python Developer<") == 1
+        assert 'class="board" href="https://djinni.co/jobs/1"' in page
+        assert 'class="board" href="https://www.work.ua/jobs/2/"' in page
+
+        service = CatalogService(catalog, interval_hours=24, pages=1)
+        client = TestClient(
+            create_app(catalog, service, start_scheduler=False), base_url="http://127.0.0.1"
+        )
+        sign_in(client, catalog)
+        payload = client.get("/api/jobs").json()
+        acme_json = next(item for item in payload if item["company"] == "Acme")
+        assert [board["source"] for board in acme_json["listings"]] == ["Djinni", "Work.ua"]
+        report = render_page(
+            [
+                _job(source="Djinni", url="https://djinni.co/jobs/1", company="Acme"),
+                _job(
+                    source="Work.ua",
+                    url="https://www.work.ua/jobs/2/",
+                    job_id="2",
+                    company="Acme",
+                ),
+            ],
+            [djinni, workua],
+        )
+        assert report.count(">Python Developer<") == 1
+        assert 'class="board" href="https://djinni.co/jobs/1"' in report
+        assert 'class="board" href="https://www.work.ua/jobs/2/"' in report
 
     def test_fastapi_lists_jobs_and_filters_them(self, tmp_path):
         catalog = Catalog(tmp_path / "catalog.sqlite")

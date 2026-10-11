@@ -72,7 +72,7 @@ def render_row(item: StoredJob, t: Translator, *, actions: bool = True) -> str:
         f'<td class="when">{escape(job.published or "—")}</td>',
         f'<td class="job"><a class="title" href="{escape(job.url)}"{open_attrs}>'
         f"{escape(job.title)}</a>{_tags(item, change, t)}"
-        f'\n        <div class="meta">{escape(job.source)}{category}{english}{years}</div></td>',
+        f'\n        <div class="meta">{_boards(item, open_attrs)}{category}{english}{years}</div></td>',
         f'<td class="company">{company}</td>',
         f'<td class="where">{escape(remote)}{location}</td>',
         f'<td class="{pay_class}">{escape(salary)}</td>',
@@ -82,6 +82,14 @@ def render_row(item: StoredJob, t: Translator, *, actions: bool = True) -> str:
         cells.append(_mine(item, t))
     body = "\n      ".join(cells)
     return f"<tr{class_attr}{data}>\n      {body}\n    </tr>"
+
+
+def _boards(item: StoredJob, open_attrs: str) -> str:
+    listings = item.listings or ((item.job.source, item.job.url),)
+    links = []
+    for source, url in listings:
+        links.append(f'<a class="board" href="{escape(url)}"{open_attrs}>{escape(source)}</a>')
+    return " · ".join(links)
 
 
 def _tags(item: StoredJob, change: str, t: Translator) -> str:

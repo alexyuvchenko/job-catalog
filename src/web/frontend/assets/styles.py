@@ -155,6 +155,8 @@ CSS = """
     a { color: var(--green); }
     .title { font-weight: 600; }
     .meta { color: var(--muted); font-size: 0.88rem; margin-top: 3px; }
+    .meta a.board { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+    .meta a.board:hover { color: var(--green); }
     .badge {
       display: inline-block; border-radius: 999px; padding: 1px 8px;
       background: var(--green-soft); color: var(--green); font-size: 0.78rem;

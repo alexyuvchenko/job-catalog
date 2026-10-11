@@ -41,6 +41,8 @@ class StoredJob:
     changed_now: bool = False
     closed_now: bool = False
     language: str = ""
+    # Boards that list this same title at this company. Always includes the primary URL.
+    listings: tuple[tuple[str, str], ...] = ()
 
     @property
     def change(self) -> str:

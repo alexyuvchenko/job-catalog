@@ -10,6 +10,7 @@ from pathlib import Path
 from core.models import Job, SourceStatus
 from core.paths import OUT_DIR
 from jobs.search import Query
+from storage.group import group_same_positions
 from storage.records import StoredJob
 from web.frontend.assets.styles import CSS
 from web.frontend.catalog_rows import render_rows
@@ -76,11 +77,13 @@ def write_outputs(jobs: list[Job], statuses: list[SourceStatus], query: Query) -
 
 def render_page(jobs: list[Job], statuses: list[SourceStatus], language: str = "uk") -> str:
     t = translator(language)
-    items = [StoredJob(job=job, active=True, first_seen="", last_seen="") for job in jobs]
+    items = group_same_positions(
+        [StoredJob(job=job, active=True, first_seen="", last_seen="") for job in jobs]
+    )
     rows = render_rows(items, t, actions=False)
     if not rows:
         rows = f'<tr><td colspan="6" class="empty">{escape(t("report_empty"))}</td></tr>'
-    new_count = sum(1 for job in jobs if job.is_new)
+    new_count = sum(1 for item in items if item.job.is_new)
     new_note = t("report_new", n=new_count) if new_count else ""
     return f"""<!DOCTYPE html>
 <html lang="{language}">
@@ -96,7 +99,7 @@ def render_page(jobs: list[Job], statuses: list[SourceStatus], language: str = "
   <p class="lede">{escape(t("lede_report"))}</p>
   {source_chips(statuses, t)}
   <div class="toolbar">
-    <div class="count">{escape(t("report_count", n=len(jobs)))}{escape(new_note)}</div>
+    <div class="count">{escape(t("report_count", n=len(items)))}{escape(new_note)}</div>
     <input id="filter" type="search" placeholder="{escape(t("filter_list"))}" aria-label="{escape(t("filter_list"))}">
   </div>
   <div class="table-wrap">

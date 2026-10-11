@@ -66,6 +66,7 @@ The local service keeps the remote engineering list and refreshes it on its own.
 - a vacancy that is still listed is updated
 - a vacancy that disappeared from a site that responded in full is marked inactive
 - if a site fails, or only some of its pages load, the vacancies it already had stay, and the ones it returned are still added or updated
+- the same title at the same company on more than one board is one row, with a link for each board
 
 ```bash
 uv run job-catalog --serve
@@ -122,7 +123,7 @@ Every row has buttons that save at once, without leaving the page:
 - ✓ viewed. Opening the title also marks it viewed. Press ✓ again to unmark.
 - ★ rating from 1 to 5. Press the same star again to clear it.
 
-Marks are stored in `data/catalog.sqlite` by account and link, and they survive refreshes. If a vacancy disappears and returns, its marks are still there. Sign in from the catalog page. The first visit can create the account. Anyone who can open the address can create an account and read the shared list. Marks, ratings, and filters belong to the account that set them, so another account does not see yours. See [Open it on a phone](#open-it-on-a-phone).
+Marks are stored in `data/catalog.sqlite` by account and link, and they survive refreshes. A mark on a grouped row is saved on every board URL for that title and company. If a vacancy disappears and returns, its marks are still there. Sign in from the catalog page. The first visit can create the account. Anyone who can open the address can create an account and read the shared list. Marks, ratings, and filters belong to the account that set them, so another account does not see yours. See [Open it on a phone](#open-it-on-a-phone).
 
 ### Filters and pages
 
@@ -186,7 +187,7 @@ The catalog, marks, filters, and refresh require a signed-in session. Pages redi
 | `GET /` | The catalog page. Without a session, this redirects to `/login`. With a session and no filter query, it opens the account’s saved filters. `/?reset=1` clears them. |
 | `GET /health` | Whether a refresh is running, stored job and account counts, the last finish time, and the last error. `GET /api/status` is the same. It answers 503 when the database cannot be read. |
 | `GET /?page=2&per_page=100` | A page of the list. `per_page` is 25, 50, 100, or 200. Other values fall back to the default. |
-| `GET /api/jobs` | The filtered list as JSON, not paged. It adds `active`, `change`, `changes`, `language`, `favorite`, `hidden`, `rating`, and `viewed` to each vacancy. Query parameters match the page: `q`, `source`, `min_salary`, `english`, `min_years`, `full_remote_only`, `include_inactive`, `mine` (`all`, `favorites`, `unviewed`, `viewed`, `rated`, `hidden`), `min_rating`, `change` (`added`, `changed`, `closed`), `language` (`en`, `uk`), `sort` (`date`, `job`, `company`), `dir` (`asc`, `desc`). |
+| `GET /api/jobs` | The filtered list as JSON, not paged. It adds `active`, `change`, `changes`, `language`, `favorite`, `hidden`, `rating`, `viewed`, and `listings` (each board URL for this title and company) to each vacancy. Query parameters match the page: `q`, `source`, `min_salary`, `english`, `min_years`, `full_remote_only`, `include_inactive`, `mine` (`all`, `favorites`, `unviewed`, `viewed`, `rated`, `hidden`), `min_rating`, `change` (`added`, `changed`, `closed`), `language` (`en`, `uk`), `sort` (`date`, `job`, `company`), `dir` (`asc`, `desc`). |
 | `POST /api/jobs/state` | Saves your marks. JSON body: `url` and any of `favorite`, `hidden`, `rating` (0 to 5), `viewed`. Omitted fields stay as they are. Answers with the stored marks, or 404 for an unknown vacancy. Only accepted from the page's own origin. |
 | `GET /fragments/rows` | The next rows as JSON for «Показати ще». Takes the same query as the page. |
 | `GET /docs` | Interactive API docs. |

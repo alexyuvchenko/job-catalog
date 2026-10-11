@@ -9,6 +9,7 @@ from core.classify import detect_language
 from core.models import Job, SourceStatus
 from core.paths import CATALOG_PATH
 from storage.filters import MAX_RATING, CatalogFilters, apply_sort, is_visible
+from storage.group import group_same_positions, position_key_parts
 from storage.records import JobMarks, MergeStats, StoredJob
 from storage.sqlite import connect
 from web.auth import (
@@ -148,7 +149,7 @@ class Catalog:
             if is_visible(stored, filters):
                 found.append(stored)
         apply_sort(found, filters)
-        return found
+        return group_same_positions(found)
 
     def set_marks(
         self,
@@ -168,7 +169,10 @@ class Catalog:
             # keeps the second from overwriting the first with stale values.
             if not connection.in_transaction:
                 connection.execute("BEGIN IMMEDIATE")
-            if connection.execute("SELECT 1 FROM jobs WHERE url = ?", (url,)).fetchone() is None:
+            job_row = connection.execute(
+                "SELECT title, company FROM jobs WHERE url = ?", (url,)
+            ).fetchone()
+            if job_row is None:
                 return None
             row = connection.execute(
                 """
@@ -194,27 +198,28 @@ class Catalog:
                 marks.rating = rating
             if viewed is not None:
                 marks.viewed_at = (marks.viewed_at or now_stamp()) if viewed else ""
-            connection.execute(
-                """
-                INSERT INTO job_states (user_id, url, favorite, hidden, rating, viewed_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(user_id, url) DO UPDATE SET
-                    favorite = excluded.favorite,
-                    hidden = excluded.hidden,
-                    rating = excluded.rating,
-                    viewed_at = excluded.viewed_at,
-                    updated_at = excluded.updated_at
-                """,
-                (
-                    user_id,
-                    url,
-                    int(marks.favorite),
-                    int(marks.hidden),
-                    marks.rating,
-                    marks.viewed_at,
-                    now_stamp(),
-                ),
+            stamp = now_stamp()
+            payload = (
+                int(marks.favorite),
+                int(marks.hidden),
+                marks.rating,
+                marks.viewed_at,
+                stamp,
             )
+            for sibling in _sibling_urls(connection, url, job_row["title"], job_row["company"]):
+                connection.execute(
+                    """
+                    INSERT INTO job_states (user_id, url, favorite, hidden, rating, viewed_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(user_id, url) DO UPDATE SET
+                        favorite = excluded.favorite,
+                        hidden = excluded.hidden,
+                        rating = excluded.rating,
+                        viewed_at = excluded.viewed_at,
+                        updated_at = excluded.updated_at
+                    """,
+                    (user_id, sibling, *payload),
+                )
         return marks
 
     def create_user(self, username: str, password: str) -> User:
@@ -630,6 +635,17 @@ def _migrate_marks(connection: sqlite3.Connection) -> None:
         """
     )
     connection.execute("PRAGMA foreign_keys=ON")
+
+
+def _sibling_urls(connection: sqlite3.Connection, url: str, title: str, company: str) -> list[str]:
+    key = position_key_parts(title, company)
+    if key is None:
+        return [url]
+    found = []
+    for row in connection.execute("SELECT url, title, company FROM jobs"):
+        if position_key_parts(row["title"], row["company"]) == key:
+            found.append(row["url"])
+    return found or [url]
 
 
 def _values(job: Job) -> tuple:
