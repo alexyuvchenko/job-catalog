@@ -20,7 +20,7 @@ If a page asks for that check, Chrome moves on screen and the search waits up to
 
 ## Setup
 
-Python 3.12 and [uv](https://docs.astral.sh/uv/) are required.
+Python 3.15 and [uv](https://docs.astral.sh/uv/) are required.
 
 ```bash
 uv sync
@@ -174,15 +174,18 @@ The database is `data/catalog.sqlite`. `data/` and `out/` are local state. After
 
 ## Layout
 
-The package is `src/jobsearch`, with tests in `tests/`.
+The code is in `src/` (an application, not a library), with tests in `tests/`.
 
+- `core` — models, classification (remote, salary, English, language), constants, paths, logging
 - `sources` — one module per job board
-- `http` — page fetch and off-screen Chrome
-- `db` — the SQLite catalog, accounts, and the shared SQLite settings
-- `web` — the server and API (`server.py`), the catalog page (`pages.py`, `rows.py`, `styles.py`, `script.py`), the Ukrainian and English text (`i18n.py`), and the saved report (`report.py`)
-- `search.py`, `service.py`, `cli.py` — a one-off search, the refresh loop, and the command
+- `network` — page fetch and off-screen Chrome
+- `storage` — the SQLite catalog (`catalog.py`), its filters and sorting (`filters.py`), returned records (`records.py`), and shared SQLite settings (`sqlite.py`)
+- `jobs` — the refresh loop (`refresh.py`) and the one-off search (`search.py`)
+- `web` — the FastAPI app (`app.py`), host check and response headers (`security.py`), page language (`language.py`), and the routes in `auth/` and `catalog/`
+- `web/frontend` — pages, rows, components, the Ukrainian and English text (`i18n.py`), the saved report (`report.py`), and `assets/` (CSS and JavaScript)
+- `cli.py` — the command
 
-`uv run job-search` is the command. `uv run python -m jobsearch` does the same thing.
+`uv run job-search` is the command. `uv run python -m cli` does the same thing.
 
 `data/` and `out/` are created next to `pyproject.toml`, so run the app from a checkout of this repository.
 
@@ -191,5 +194,5 @@ The package is `src/jobsearch`, with tests in `tests/`.
 ```bash
 uv run ruff check
 uv run ruff format
-uv run python -m unittest discover -s tests
+uv run pytest
 ```

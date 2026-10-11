@@ -9,19 +9,22 @@ uv sync                                          # install
 uv run job-search --serve                        # catalog service on 127.0.0.1:8765
 uv run job-search --keyword python               # one-off search, writes out/
 uv run ruff check --fix . && uv run ruff format .
-uv run python -m unittest discover -s tests      # all tests
-uv run python -m unittest tests.test_marks       # one module
+uv run pytest                                 # all tests
+uv run pytest tests/test_marks.py                # one module
 ```
 
 Run ruff and the tests after every substantive change. Live fetches, Chrome, and `uv sync` need network access, so they do not work in a restricted sandbox.
 
-## Layout (`src/jobsearch`)
+## Layout (`src/`, flat: import as `core`, `web`, and so on)
 
 - `sources/` — one module per board: Djinni, DOU, Work.ua, Robota.ua, Jooble. Fetchers return `Listing(jobs, message, complete)`.
-- `http/` — `client.py` (urllib, cookies per domain) and `browser.py` (headed off-screen Chrome via Playwright, used by Work.ua, Robota.ua, Jooble).
-- `db/catalog.py` — SQLite catalog: merge, change detection, marks (`job_states`), filters. `db/sqlite.py` — shared connection settings (WAL).
-- `web/` — `server.py` (FastAPI, middleware, routes), `pages.py` (catalog page), `rows.py`, `styles.py`, `script.py`, `parts.py`, `i18n.py` (UK/EN text), `report.py` (static `out/jobs.html`, JSON, CSV).
-- `search.py` (one-off search), `service.py` (refresh loop), `cli.py`, `classify.py` (remote, salary, English, description language), `constants.py`, `paths.py`.
+- `network/` — `client.py` (urllib, cookies per domain) and `browser.py` (headed off-screen Chrome via Playwright, used by Work.ua, Robota.ua, Jooble).
+- `core/` — `models.py`, `classify.py` (remote, salary, English, description language), `constants.py`, `paths.py`, `log.py`. No imports from other project packages.
+- `storage/` — `catalog.py`: SQLite catalog (merge, change detection, marks in `job_states`, accounts). `filters.py`: `CatalogFilters`, sorting, visibility. `records.py`: `StoredJob`, `JobMarks`, `MergeStats`. `sqlite.py`: shared connection settings (WAL).
+- `jobs/` — `refresh.py` (refresh loop, `CatalogService`) and `search.py` (one-off search).
+- `web/` — `app.py` builds the FastAPI app and mounts routers. `security.py`: allowed hosts and response headers. `language.py`: page language and cookie. `auth/`: accounts and sign-in routes. `catalog/`: list, marks, and refresh routes.
+- `web/frontend/` — `pages.py`, `catalog_rows.py`, `components.py`, `account_page.py`, `report.py` (saved report), `i18n.py` (Ukrainian and English text), and `assets/styles.py`, `assets/script.py`.
+- `cli.py` — entry point (`job-search` script, or `python -m cli`).
 
 `data/` (catalog and cache DBs) and `out/` are local state next to `pyproject.toml`. Do not commit them.
 
@@ -33,13 +36,13 @@ Run ruff and the tests after every substantive change. Live fetches, Chrome, and
 - **Catalog merge.** Merge by URL. A failed or incomplete source never deactivates its old rows, and neither does a source that returned no jobs. "New", "changed" and "closed" mean what the latest successful refresh did, so they need at least two successful refreshes. Tracked fields are in `TRACKED_FIELDS`. Dates and snippets are deliberately not compared.
 - **Marks.** `set_marks` takes the write lock first (`BEGIN IMMEDIATE`) so quick clicks cannot overwrite each other. Marking "not for me" clears favorite, and the reverse.
 - **Web security.** Default bind is `127.0.0.1`. With `--host`, `AllowedHosts` accepts only private IPs, never other names (DNS rebinding). POSTs must be same-origin. `/refresh` works only from the local machine. CSP is sent on HTML pages only.
-- **Text.** UI copy is Ukrainian and English: add every string to `web/i18n.py` with both languages and the same `{placeholders}`. CLI help and README are English.
+- **Text.** UI copy is Ukrainian and English: add every string to `web/frontend/i18n.py` with both languages and the same `{placeholders}`. CLI help and README are English.
 
 ## Style
 
-- Python 3.12, `ruff` line length 100, rules E/F/I/UP/B. E501 is ignored, because the formatter wraps code and HTML, CSS, SQL and regex stay on one line.
-- Tests use `unittest` and temporary directories. Network calls and Chrome are mocked.
-- In `web/script.py` the JavaScript is a plain string, not an f-string, so braces need no doubling. A regex backslash is written `\\` there.
+- Python 3.15, `ruff` line length 100, rules E/F/I/UP/B. E501 is ignored, because the formatter wraps code and HTML, CSS, SQL and regex stay on one line.
+- Tests use `pytest` and temporary directories. Network calls and Chrome are mocked.
+- In `web/frontend/assets/script.py` the JavaScript is a plain string, not an f-string, so braces need no doubling. A regex backslash is written `\\` there.
 
 ## Verifying UI changes
 

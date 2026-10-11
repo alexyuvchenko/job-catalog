@@ -1,6 +1,6 @@
 """Helpers shared by the catalog tests."""
 
-from jobsearch.auth import AccountError
+from web.auth import AccountError
 
 
 def sign_in(client, catalog, username: str = "ada", password: str = "password-1"):

@@ -1,8 +1,7 @@
-import unittest
 from datetime import date
 from http.cookiejar import Cookie
 
-from jobsearch.classify import (
+from core.classify import (
     accept_remote,
     dou_remote_mode,
     english_meets,
@@ -15,26 +14,26 @@ from jobsearch.classify import (
     parse_years,
     salary_meets,
 )
-from jobsearch.http.browser import asks_for_human, is_browser_check
-from jobsearch.http.client import Client
-from jobsearch.models import Job
-from jobsearch.sources.djinni import parse_djinni_html
-from jobsearch.sources.dou import has_reservation_badge, parse_dou_html
-from jobsearch.sources.jooble import job_from_card as jooble_job
-from jobsearch.sources.robota import job_from_item
-from jobsearch.sources.workua import job_from_card as work_job
+from core.models import Job
+from network.browser import asks_for_human, is_browser_check
+from network.client import Client
+from sources.djinni import parse_djinni_html
+from sources.dou import has_reservation_badge, parse_dou_html
+from sources.jooble import job_from_card as jooble_job
+from sources.robota import job_from_item
+from sources.workua import job_from_card as work_job
 
 
-class BrowserCheckTests(unittest.TestCase):
+class TestBrowserCheck:
     def test_human_check_is_recognized(self):
-        self.assertTrue(asks_for_human("Just a moment...", "Verify you are human"))
-        self.assertTrue(asks_for_human("", "Підтвердьте, що ви людина"))
-        self.assertTrue(is_browser_check("Just a moment..."))
-        self.assertFalse(asks_for_human("Just a moment..."))
-        self.assertFalse(is_browser_check("Python Developer — Jooble"))
+        assert asks_for_human("Just a moment...", "Verify you are human")
+        assert asks_for_human("", "Підтвердьте, що ви людина")
+        assert is_browser_check("Just a moment...")
+        assert not (asks_for_human("Just a moment..."))
+        assert not (is_browser_check("Python Developer — Jooble"))
 
 
-class ClassifyTests(unittest.TestCase):
+class TestClassify:
     def test_engineering_roles_stay_and_hr_roles_go(self):
         kept = [
             "Senior Python Developer",
@@ -54,63 +53,63 @@ class ClassifyTests(unittest.TestCase):
             "Head of HR Operations",
         ]
         for title in kept:
-            self.assertTrue(is_it_role(title, "", "engineering"), title)
+            assert is_it_role(title, "", "engineering"), title
         for title in dropped:
-            self.assertFalse(is_it_role(title, "", "engineering"), title)
-        self.assertTrue(is_it_role("Head of HR Operations", "", "all"))
+            assert not is_it_role(title, "", "engineering"), title
+        assert is_it_role("Head of HR Operations", "", "all")
 
     def test_salary_ranges(self):
-        self.assertEqual(parse_salary("до $2500"), (None, 2500, "USD"))
-        self.assertEqual(parse_salary("від $3000"), (3000, None, "USD"))
-        self.assertEqual(parse_salary("$3000–4000"), (3000, 4000, "USD"))
-        self.assertEqual(parse_salary("80 000 грн"), (80000, 80000, "UAH"))
+        assert parse_salary("до $2500") == (None, 2500, "USD")
+        assert parse_salary("від $3000") == (3000, None, "USD")
+        assert parse_salary("$3000–4000") == (3000, 4000, "USD")
+        assert parse_salary("80 000 грн") == (80000, 80000, "UAH")
 
     def test_salary_filter_uses_the_top_of_the_range(self):
         low = _job(salary_min=1000, salary_max=1500, currency="USD")
         overlap = _job(salary_min=1000, salary_max=3000, currency="USD")
         unknown = _job()
         hryvnia = _job(salary_min=80000, salary_max=90000, currency="UAH")
-        self.assertFalse(salary_meets(low, 2000))
-        self.assertTrue(salary_meets(overlap, 2000))
-        self.assertTrue(salary_meets(unknown, 2000))
-        self.assertTrue(salary_meets(hryvnia, 2000))
+        assert not (salary_meets(low, 2000))
+        assert salary_meets(overlap, 2000)
+        assert salary_meets(unknown, 2000)
+        assert salary_meets(hryvnia, 2000)
 
     def test_english_and_years(self):
-        self.assertEqual(parse_english("Англійська - B1"), "B1")
-        self.assertEqual(parse_english("English - None"), "none")
-        self.assertTrue(english_meets("B2", "B1"))
-        self.assertFalse(english_meets("A2", "B2"))
-        self.assertTrue(english_meets("", "B2"))
-        self.assertFalse(english_meets("none", "B1"))
-        self.assertEqual(parse_years("3 роки досвіду"), 3)
-        self.assertEqual(parse_years("5 years of experience"), 5)
+        assert parse_english("Англійська - B1") == "B1"
+        assert parse_english("English - None") == "none"
+        assert english_meets("B2", "B1")
+        assert not (english_meets("A2", "B2"))
+        assert english_meets("", "B2")
+        assert not (english_meets("none", "B1"))
+        assert parse_years("3 роки досвіду") == 3
+        assert parse_years("5 years of experience") == 5
 
     def test_dou_date_rolls_back_a_future_month(self):
         today = date(2026, 10, 10)
-        self.assertEqual(parse_dou_date("9 жовтня", today), "2026-10-09")
-        self.assertEqual(parse_dou_date("15 грудня", today), "2025-12-15")
-        self.assertEqual(parse_dou_date("9 жовтня 2024", today), "2024-10-09")
-        self.assertEqual(parse_relative_date("2026-10-08 16:40:04", today), "2026-10-08")
-        self.assertEqual(parse_relative_date("2 дні тому", today), "2026-10-08")
-        self.assertEqual(parse_relative_date("2 дня назад", today), "2026-10-08")
-        self.assertEqual(parse_relative_date("1 неделю назад", today), "2026-10-03")
-        self.assertEqual(parse_relative_date("3 недели назад", today), "2026-09-19")
+        assert parse_dou_date("9 жовтня", today) == "2026-10-09"
+        assert parse_dou_date("15 грудня", today) == "2025-12-15"
+        assert parse_dou_date("9 жовтня 2024", today) == "2024-10-09"
+        assert parse_relative_date("2026-10-08 16:40:04", today) == "2026-10-08"
+        assert parse_relative_date("2 дні тому", today) == "2026-10-08"
+        assert parse_relative_date("2 дня назад", today) == "2026-10-08"
+        assert parse_relative_date("1 неделю назад", today) == "2026-10-03"
+        assert parse_relative_date("3 недели назад", today) == "2026-09-19"
 
     def test_remote_modes(self):
-        self.assertEqual(dou_remote_mode("віддалено"), "full")
-        self.assertEqual(dou_remote_mode("Київ, Львів, віддалено"), "hybrid")
-        self.assertEqual(dou_remote_mode("Київ"), "office")
-        self.assertTrue(accept_remote("hybrid", full_remote_only=False))
-        self.assertFalse(accept_remote("hybrid", full_remote_only=True))
-        self.assertFalse(accept_remote("office", full_remote_only=False))
+        assert dou_remote_mode("віддалено") == "full"
+        assert dou_remote_mode("Київ, Львів, віддалено") == "hybrid"
+        assert dou_remote_mode("Київ") == "office"
+        assert accept_remote("hybrid", full_remote_only=False)
+        assert not (accept_remote("hybrid", full_remote_only=True))
+        assert not (accept_remote("office", full_remote_only=False))
 
     def test_evidence_sentence(self):
         text = "Команда в Україні. Надаємо бронювання від мобілізації за наявності документів. Графік гнучкий."
         quote = evidence_sentence(text)
-        self.assertIn("бронювання від мобілізації", quote)
+        assert "бронювання від мобілізації" in quote
 
 
-class ParserTests(unittest.TestCase):
+class TestParsers:
     def test_djinni_jsonld_survives_brackets_in_the_description(self):
         html = """
         <span class="fs-1 fw-bold text-muted">12</span>
@@ -138,19 +137,19 @@ class ParserTests(unittest.TestCase):
         </div>
         """
         jobs, total = parse_djinni_html(html)
-        self.assertEqual(total, 12)
-        self.assertEqual(len(jobs), 1)
+        assert total == 12
+        assert len(jobs) == 1
         job = jobs[0]
-        self.assertEqual(job.title, "Python Developer")
-        self.assertEqual(job.company, "Example")
-        self.assertEqual(job.remote, "full")
-        self.assertEqual(job.salary_min, 3000)
-        self.assertEqual(job.salary_max, 4000)
-        self.assertEqual(job.years, 3)
-        self.assertEqual(job.english, "B2")
-        self.assertEqual(job.reservation, "confirmed")
-        self.assertEqual(job.published, "2026-10-09")
-        self.assertIn("бронювання", job.evidence)
+        assert job.title == "Python Developer"
+        assert job.company == "Example"
+        assert job.remote == "full"
+        assert job.salary_min == 3000
+        assert job.salary_max == 4000
+        assert job.years == 3
+        assert job.english == "B2"
+        assert job.reservation == "confirmed"
+        assert job.published == "2026-10-09"
+        assert "бронювання" in job.evidence
 
     def test_djinni_remote_filter_keeps_a_job_without_an_explicit_label(self):
         html = """
@@ -164,7 +163,7 @@ class ParserTests(unittest.TestCase):
         </div>
         """
         jobs, _ = parse_djinni_html(html)
-        self.assertEqual(jobs[0].remote, "remote")
+        assert jobs[0].remote == "remote"
 
     def test_dou_card_and_badge(self):
         html = """
@@ -180,16 +179,16 @@ class ParserTests(unittest.TestCase):
         </li>
         """
         jobs = parse_dou_html(html)
-        self.assertEqual(len(jobs), 1)
-        self.assertEqual(jobs[0].job_id, "55")
-        self.assertEqual(jobs[0].url, "https://jobs.dou.ua/companies/acme/vacancies/55/")
-        self.assertEqual(jobs[0].company, "Acme")
-        self.assertEqual(jobs[0].remote, "full")
-        self.assertEqual(jobs[0].salary_min, 3000)
-        self.assertEqual(jobs[0].reservation, "unverified")
+        assert len(jobs) == 1
+        assert jobs[0].job_id == "55"
+        assert jobs[0].url == "https://jobs.dou.ua/companies/acme/vacancies/55/"
+        assert jobs[0].company == "Acme"
+        assert jobs[0].remote == "full"
+        assert jobs[0].salary_min == 3000
+        assert jobs[0].reservation == "unverified"
         badge = '<a class="badge" href="https://jobs.dou.ua/vacancies/?search=бронювання&from=badge">бронювання</a>'
-        self.assertTrue(has_reservation_badge(badge))
-        self.assertFalse(has_reservation_badge("<p>система бронювання квитків</p>"))
+        assert has_reservation_badge(badge)
+        assert not (has_reservation_badge("<p>система бронювання квитків</p>"))
 
     def test_workua_keeps_only_the_reservation_badge(self):
         today = date(2026, 10, 10)
@@ -205,14 +204,13 @@ class ParserTests(unittest.TestCase):
                 "reserved": True,
             }
         )
-        self.assertIsNotNone(kept)
         assert kept is not None
-        self.assertEqual(kept.source, "Work.ua")
-        self.assertEqual(kept.remote, "full")
-        self.assertEqual(kept.years, 1)
-        self.assertEqual(kept.published, "2026-10-08")
-        self.assertEqual(kept.reservation, "confirmed")
-        self.assertIsNone(
+        assert kept.source == "Work.ua"
+        assert kept.remote == "full"
+        assert kept.years == 1
+        assert kept.published == "2026-10-08"
+        assert kept.reservation == "confirmed"
+        assert (
             work_job(
                 {
                     "href": "/jobs/1/",
@@ -225,6 +223,7 @@ class ParserTests(unittest.TestCase):
                     "reserved": False,
                 }
             )
+            is None
         )
         hybrid = work_job(
             {
@@ -239,10 +238,10 @@ class ParserTests(unittest.TestCase):
             }
         )
         assert hybrid is not None
-        self.assertEqual(hybrid.remote, "hybrid")
-        self.assertEqual(hybrid.salary_max, 2000)
-        self.assertEqual(hybrid.currency, "USD")
-        self.assertEqual(parse_relative_date("2 дні тому", today), "2026-10-08")
+        assert hybrid.remote == "hybrid"
+        assert hybrid.salary_max == 2000
+        assert hybrid.currency == "USD"
+        assert parse_relative_date("2 дні тому", today) == "2026-10-08"
 
     def test_robota_requires_remote_schedule(self):
         job = job_from_item(
@@ -259,10 +258,10 @@ class ParserTests(unittest.TestCase):
             }
         )
         assert job is not None
-        self.assertEqual(job.url, "https://robota.ua/company198563/vacancy11368370")
-        self.assertEqual(job.remote, "hybrid")
-        self.assertEqual(job.reservation, "confirmed")
-        self.assertIn("Бронирование", job.evidence)
+        assert job.url == "https://robota.ua/company198563/vacancy11368370"
+        assert job.remote == "hybrid"
+        assert job.reservation == "confirmed"
+        assert "Бронирование" in job.evidence
         anonymous = job_from_item(
             {
                 "id": 11366974,
@@ -272,7 +271,7 @@ class ParserTests(unittest.TestCase):
             }
         )
         assert anonymous is not None
-        self.assertEqual(anonymous.url, "https://robota.ua/company0/vacancy11366974")
+        assert anonymous.url == "https://robota.ua/company0/vacancy11366974"
         office = job_from_item(
             {
                 "id": 1,
@@ -281,7 +280,7 @@ class ParserTests(unittest.TestCase):
                 "company": {"id": 2, "name": "Acme"},
             }
         )
-        self.assertIsNone(office)
+        assert office is None
 
     def test_jooble_keeps_a_card_only_when_the_text_states_reservation(self):
         kept = jooble_job(
@@ -292,12 +291,12 @@ class ParserTests(unittest.TestCase):
             }
         )
         assert kept is not None
-        self.assertEqual(kept.job_id, "9988")
-        self.assertEqual(kept.company, "EBS")
-        self.assertEqual(kept.salary_min, 3000)
-        self.assertEqual(kept.salary_max, 5000)
-        self.assertEqual(kept.currency, "USD")
-        self.assertEqual(kept.remote, "full")
+        assert kept.job_id == "9988"
+        assert kept.company == "EBS"
+        assert kept.salary_min == 3000
+        assert kept.salary_max == 5000
+        assert kept.currency == "USD"
+        assert kept.remote == "full"
         dropped = jooble_job(
             {
                 "title": "Senior Accounting Manager",
@@ -305,8 +304,8 @@ class ParserTests(unittest.TestCase):
                 "text": "Senior Accounting Manager\nБухгалтерія\nВіддалено",
             }
         )
-        self.assertIsNone(dropped)
-        self.assertTrue(evidence_sentence("можливість бронювання працівників"))
+        assert dropped is None
+        assert evidence_sentence("можливість бронювання працівників")
         tagged = jooble_job(
             {
                 "title": "Data Scientist",
@@ -315,9 +314,9 @@ class ParserTests(unittest.TestCase):
             }
         )
         assert tagged is not None
-        self.assertEqual(tagged.evidence, "Бронювання")
-        self.assertEqual(tagged.company, "OM Defence Systems")
-        self.assertEqual(tagged.location, "Віддалено")
+        assert tagged.evidence == "Бронювання"
+        assert tagged.company == "OM Defence Systems"
+        assert tagged.location == "Віддалено"
         noisy = jooble_job(
             {
                 "title": "Data Scientist",
@@ -330,17 +329,17 @@ class ParserTests(unittest.TestCase):
             }
         )
         assert noisy is not None
-        self.assertEqual(noisy.location, "Віддалено")
-        self.assertEqual(noisy.company, "OM Defence Systems")
+        assert noisy.location == "Віддалено"
+        assert noisy.company == "OM Defence Systems"
 
 
-class ClientCookieTests(unittest.TestCase):
+class TestClientCookies:
     def test_csrf_cookie_is_chosen_for_the_request_host(self):
         client = Client()
         client._cookies.set_cookie(_cookie("djinni.co", "djinni-token"))
         client._cookies.set_cookie(_cookie(".dou.ua", "dou-token"))
-        self.assertEqual(client.cookie("csrftoken", "jobs.dou.ua"), "dou-token")
-        self.assertEqual(client.cookie("csrftoken", "djinni.co"), "djinni-token")
+        assert client.cookie("csrftoken", "jobs.dou.ua") == "dou-token"
+        assert client.cookie("csrftoken", "djinni.co") == "djinni-token"
 
 
 def _cookie(domain: str, value: str) -> Cookie:
@@ -388,7 +387,3 @@ def _job(**overrides) -> Job:
     )
     data.update(overrides)
     return Job(**data)
-
-
-if __name__ == "__main__":
-    unittest.main()
