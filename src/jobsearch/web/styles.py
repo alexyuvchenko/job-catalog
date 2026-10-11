@@ -120,6 +120,11 @@ CSS = """
       font-size: 0.78rem; letter-spacing: 0.03em; text-transform: uppercase; color: var(--muted);
       background: var(--card);
     }
+    th a.sort { color: inherit; text-decoration: none; white-space: nowrap; }
+    th a.sort { cursor: pointer; }
+    th a.sort:hover { text-decoration: underline; }
+    th a.sort .idle { opacity: 0.45; }
+    th[aria-sort] a.sort { color: var(--green); }
     tr:last-child td { border-bottom: 0; }
     tbody tr { --mark: transparent; }
     tbody tr:hover { background: #f4f8f6; }

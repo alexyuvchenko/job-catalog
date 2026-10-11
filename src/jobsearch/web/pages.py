@@ -15,6 +15,7 @@ from jobsearch.db.catalog import (
     MINE_CHOICES,
     CatalogFilters,
     StoredJob,
+    default_descending,
 )
 from jobsearch.models import SourceStatus
 from jobsearch.web.i18n import LANGUAGES, Translator, translator
@@ -88,6 +89,8 @@ def filter_params(
         ("full_remote_only", "1" if filters.full_remote_only else ""),
         ("include_inactive", "1" if filters.include_inactive else ""),
         ("per_page", "" if per_page == DEFAULT_PER_PAGE else str(per_page)),
+        ("sort", filters.sort),
+        ("dir", "" if filters.descending is None else ("desc" if filters.descending else "asc")),
     ]
     return [(name, value) for name, value in params if value]
 
@@ -141,9 +144,9 @@ def render_catalog(view: CatalogView) -> str:
     <caption>{escape(t("table_caption"))}</caption>
     <thead>
       <tr>
-        <th>{escape(t("th_date"))}</th>
-        <th>{escape(t("th_job"))}</th>
-        <th>{escape(t("th_company"))}</th>
+        {_sort_header(view, t, "date")}
+        {_sort_header(view, t, "job")}
+        {_sort_header(view, t, "company")}
         <th>{escape(t("th_format"))}</th>
         <th>{escape(t("th_salary"))}</th>
         <th>{escape(t("th_reservation"))}</th>
@@ -165,6 +168,35 @@ def render_catalog(view: CatalogView) -> str:
 </body>
 </html>
 """
+
+
+def _sort_header(view: CatalogView, t: Translator, column: str) -> str:
+    """A column title that sorts by that column; a second click reverses the order."""
+    filters = view.filters
+    current = filters.sort or "date"
+    descending = (
+        default_descending(filters.sort) if filters.descending is None else filters.descending
+    )
+    active = current == column
+    next_desc = not descending if active else default_descending(column)
+    params = [
+        (name, value)
+        for name, value in filter_params(filters, view.per_page)
+        if name not in ("sort", "dir")
+    ]
+    params += [("sort", column), ("dir", "desc" if next_desc else "asc")]
+    href = escape("/?" + urlencode(params))
+    arrow = ' <span class="idle" aria-hidden="true">⇅</span>'
+    state = ""
+    if active:
+        arrow = (
+            ' <span aria-hidden="true">▼</span>'
+            if descending
+            else ' <span aria-hidden="true">▲</span>'
+        )
+        state = f' aria-sort="{"descending" if descending else "ascending"}"'
+    label = escape(t(f"th_{column}"))
+    return f'<th{state}><a class="sort" href="{href}">{label}{arrow}</a></th>'
 
 
 def _statusline(view: CatalogView, t: Translator) -> str:
@@ -258,13 +290,23 @@ def _form(view: CatalogView, t: Translator) -> str:
     else:
         button = t("refresh_running") if view.running else t("refresh_now")
     disabled = " disabled" if view.running or not view.can_refresh else ""
-    active = sum(1 for name, _ in filter_params(filters, view.per_page) if name != "per_page")
+    active = sum(
+        1
+        for name, _ in filter_params(filters, view.per_page)
+        if name not in ("per_page", "sort", "dir")
+    )
+    hidden_sort = "".join(
+        f'<input type="hidden" name="{name}" value="{escape(value)}">'
+        for name, value in filter_params(filters, view.per_page)
+        if name in ("sort", "dir")
+    )
     summary = escape(t("filters"))
     if active:
         summary += f' <span class="badge">{escape(t("filters_active", n=active))}</span>'
     return f"""<details class="panel" id="filter-panel" open>
   <summary>{summary}</summary>
   <form id="filters" class="bare" action="/" method="get">
+    {hidden_sort}
     <div class="grid">
       <label>{escape(t("f_q"))}
         <input name="q" type="search" value="{escape(filters.text)}" placeholder="{escape(t("f_q_hint"))}">

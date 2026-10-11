@@ -50,6 +50,16 @@ class CatalogFilters:
     change: str = ""
     # Language of the description: "en" or "uk".
     language: str = ""
+    # Column to sort by ("" keeps the default: newest first) and its direction.
+    sort: str = ""
+    descending: bool | None = None
+
+
+SORT_CHOICES = ("", "date", "job", "company")
+
+
+def default_descending(sort: str) -> bool:
+    return sort in ("", "date")
 
 
 @dataclass
@@ -199,6 +209,18 @@ class Catalog:
             stored = _stored(row, cutoff)
             if _visible(stored, filters):
                 found.append(stored)
+        if filters.sort:
+            descending = (
+                default_descending(filters.sort)
+                if filters.descending is None
+                else filters.descending
+            )
+            keys = {
+                "date": lambda s: s.job.published,
+                "job": lambda s: s.job.title.casefold(),
+                "company": lambda s: s.job.company.casefold(),
+            }
+            found.sort(key=keys[filters.sort], reverse=descending)
         return found
 
     def set_marks(

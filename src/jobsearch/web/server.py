@@ -19,6 +19,7 @@ from jobsearch.db.catalog import (
     LANGUAGE_CHOICES,
     MAX_RATING,
     MINE_CHOICES,
+    SORT_CHOICES,
     Catalog,
     CatalogFilters,
 )
@@ -409,6 +410,8 @@ def read_filters(
     min_rating: str = "",
     change: str = "",
     language: str = "",
+    sort: str = "",
+    dir: str = "",
 ) -> CatalogFilters:
     level = english.strip().upper()
     chosen = source.strip()
@@ -425,6 +428,8 @@ def read_filters(
         min_rating=rating if rating is not None and 1 <= rating <= MAX_RATING else None,
         change=change if change in CHANGE_CHOICES else "",
         language=language if language in LANGUAGE_CHOICES else "",
+        sort=sort if sort in SORT_CHOICES else "",
+        descending={"asc": False, "desc": True}.get(dir),
     )
 
 

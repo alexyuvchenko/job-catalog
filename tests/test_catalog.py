@@ -12,6 +12,24 @@ from jobsearch.web.server import create_app
 
 
 class CatalogTests(unittest.TestCase):
+    def test_sorting_by_column_and_direction(self):
+        with tempfile.TemporaryDirectory() as folder:
+            catalog = Catalog(Path(folder) / "catalog.sqlite")
+            jobs = [
+                _job(url="https://example.com/1", job_id="1", title="b", company="Zeta"),
+                _job(url="https://example.com/2", job_id="2", title="A", company="alpha"),
+            ]
+            status = SourceStatus("Djinni", True, "ok", fetched=2, kept=2)
+            catalog.merge(jobs, [status], "2026-10-10 10:00:00", "2026-10-10 10:01:00")
+
+            def titles(**kwargs):
+                return [s.job.title for s in catalog.list_jobs(CatalogFilters(**kwargs))]
+
+            self.assertEqual(titles(sort="job"), ["A", "b"])
+            self.assertEqual(titles(sort="job", descending=True), ["b", "A"])
+            self.assertEqual(titles(sort="company"), ["A", "b"])
+            self.assertEqual(titles(sort="company", descending=True), ["b", "A"])
+
     def test_merge_updates_keeps_failures_and_marks_only_new_rows(self):
         with tempfile.TemporaryDirectory() as folder:
             catalog = Catalog(Path(folder) / "catalog.sqlite")
