@@ -49,6 +49,24 @@ class TestClassify:
             "Програміст 1C",
             "Системний адміністратор",
             "сисадмін",
+            "IT спеціаліст",
+            "ІТ-фахівець",
+            "Helpdesk",
+            "Адміністратор мереж",
+            "Адміністратор сайту",
+            "Мережевий інженер",
+            "Інженер ПЗ",
+            "Верстальник HTML",
+            "DevSecOps",
+            "Product Owner",
+            "Linux Administrator",
+            "Фахівець з інформаційної безпеки",
+            "SOC Analyst",
+            "BAS Developer",
+            "Консультант BAS",
+            "Бітрікс-розробник",
+            "Angular Developer",
+            "UX/UI Designer",
         ]
         dropped = [
             "Креативний маркетолог",
@@ -59,6 +77,9 @@ class TestClassify:
             "Head of Accounts Receivable",
             "Head of HR Operations",
             "Водій навантажувача",
+            "Оператор/операторка чата платформи служби доставки",
+            "Інженер-механік",
+            "Інженер з охорони праці",
         ]
         for title in kept:
             assert is_it_role(title, "", "engineering"), title

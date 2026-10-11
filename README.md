@@ -12,7 +12,7 @@ The search reads five boards:
 - **Robota.ua** — remote vacancies whose listing is marked as employee reservation, in every rubric. A result is kept only when the title is an IT role.
 - **Jooble** — paused for now. Existing Jooble rows stay until fetching is turned back on. When fetching is on, a card is kept only if the text states reservation and the title is an IT role.
 
-IT titles are the engineering focus: developer, програміст, DevOps, системний адміністратор, QA, and the same set used elsewhere. A reserved warehouse or sales role is dropped.
+IT titles cover software, data, QA, DevOps, security, sysadmin, 1C/BAS, Bitrix, helpdesk, UX, product, and similar roles, including Ukrainian names (програміст, ІТ-фахівець, верстальник, адміністратор мереж). A reserved warehouse, sales, or chat-operator role is dropped.
 
 Djinni and DOU are read with plain HTTP requests. Work.ua and Robota.ua refuse those, so they open in Google Chrome off-screen. Chrome needs to be installed. Requests go one at a time, with a short pause.
 
