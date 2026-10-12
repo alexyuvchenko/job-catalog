@@ -113,7 +113,7 @@ def render_page(jobs: list[Job], statuses: list[SourceStatus], language: str = "
         <th>{escape(t("th_job"))}</th>
         <th>{escape(t("th_company"))}</th>
         <th>{escape(t("th_format"))}</th>
-        <th>{escape(t("th_salary"))}</th>
+        <th class="pay">{escape(t("th_salary"))}</th>
         <th>{escape(t("th_reservation"))}</th>
       </tr>
     </thead>

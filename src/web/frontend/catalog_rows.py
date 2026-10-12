@@ -120,9 +120,9 @@ def _company_cell(item: StoredJob, t: Translator, *, actions: bool) -> str:
     label = escape(t("company_open", name=name))
     button = (
         f'<button type="button" class="company-open" data-review="{escape(payload)}" '
-        f'aria-haspopup="dialog" aria-label="{label}">{shown}</button>'
+        f'aria-haspopup="dialog" aria-label="{label}">{shown}{badge}</button>'
     )
-    return f'<td class="company">{button}{badge}</td>'
+    return f'<td class="company">{button}</td>'
 
 
 def _display_sources(review: CompanyReview | None) -> tuple[ReviewSource, ...]:

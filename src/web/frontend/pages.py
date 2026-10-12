@@ -156,7 +156,7 @@ def render_catalog(view: CatalogView) -> str:
         {_sort_header(view, t, "job")}
         {_sort_header(view, t, "company")}
         <th>{escape(t("th_format"))}</th>
-        <th>{escape(t("th_salary"))}</th>
+        <th class="pay">{escape(t("th_salary"))}</th>
         <th>{escape(t("th_reservation"))}</th>
         <th>{escape(t("th_mine"))}</th>
       </tr>

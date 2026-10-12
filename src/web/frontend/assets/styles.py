@@ -143,8 +143,8 @@ CSS = """
     tr:last-child td { border-bottom: 0; }
     tbody tr { --mark: transparent; }
     tbody tr:hover { background: #f4f8f6; }
-    td.when { box-shadow: inset 4px 0 0 var(--mark); }
-    td.when, td.pay { white-space: nowrap; }
+    td.when { box-shadow: inset 4px 0 0 var(--mark); white-space: nowrap; }
+    th.pay, td.pay { width: 5.5rem; max-width: 5.5rem; white-space: normal; }
     td.where { max-width: 16rem; }
     /* What the last refresh did: the coloured edge, and a tag next to the title. */
     tr.is-new { --mark: var(--green); }
@@ -160,9 +160,10 @@ CSS = """
     .title { font-weight: 600; }
     button.company-open {
       background: none; color: inherit; border: 0; border-radius: 0; padding: 0;
-      font: inherit; font-weight: inherit; text-align: left; cursor: pointer; display: inline;
+      font: inherit; font-weight: 600; text-align: left; cursor: pointer; display: inline;
     }
     button.company-open:hover { color: var(--green); }
+    button.company-open .crate { margin-left: 6px; }
     .crate {
       margin-left: 0.4em; font-size: 0.82em; font-weight: 500;
       font-variant-numeric: tabular-nums; white-space: nowrap;
@@ -343,7 +344,7 @@ CSS = """
       td.company { grid-area: company; font-weight: 600; }
       td.status { grid-area: status; text-align: right; }
       td.where { grid-area: where; max-width: none; color: var(--muted); font-size: 0.92rem; }
-      td.pay { grid-area: pay; white-space: normal; }
+      td.pay { grid-area: pay; white-space: normal; width: auto; max-width: none; }
       td.pay.none { display: none; }
       td.when { grid-area: when; text-align: right; color: var(--muted); font-size: 0.85rem; }
       td.mine {
