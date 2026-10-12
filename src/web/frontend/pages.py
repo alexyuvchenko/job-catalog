@@ -177,10 +177,8 @@ def render_catalog(view: CatalogView) -> str:
       <button type="button" class="secondary" data-close>{escape(t("company_close"))}</button>
     </div>
     <p class="company-rate" hidden></p>
-    <p class="company-votes" hidden></p>
-    <p class="company-count" hidden></p>
+    <ul class="company-sources"></ul>
     <p class="company-none" hidden>{escape(t("company_no_score"))}</p>
-    <ul class="company-links"></ul>
     <p class="note">{escape(t("company_note"))}</p>
   </div>
 </dialog>

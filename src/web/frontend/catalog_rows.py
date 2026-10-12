@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import json
+import re
 from html import escape
 from urllib.parse import urlsplit
 
-from core.models import CompanyReview
+from core.models import CompanyReview, ReviewSource
 from storage.filters import MAX_RATING
 from storage.records import StoredJob
 from web.frontend.i18n import Translator
@@ -90,28 +91,30 @@ def _company_cell(item: StoredJob, t: Translator, *, actions: bool) -> str:
     name = item.job.company.strip()
     shown = escape(name) if name else "—"
     review = item.review
-    if review is None or (review.rating is None and not review.review_count):
+    sources = _display_sources(review)
+    if review is None or not sources:
         return f'<td class="company">{shown}</td>'
     badge = _rate_badge(review, t)
     if not actions:
         return f'<td class="company">{shown}{badge}</td>'
-    links = []
-    reviews_url = _dou_page(review.reviews_url)
-    poll_url = _dou_page(review.poll_url)
-    if reviews_url:
-        links.append({"href": reviews_url, "label": t("link_company_reviews")})
-    if poll_url:
-        links.append({"href": poll_url, "label": t("link_company_poll")})
-    if not links:
+    payload_sources = []
+    for source in sources:
+        links = _source_links(source, t)
+        if not links:
+            continue
+        payload_sources.append(
+            {
+                "name": source.source,
+                "score": source.score,
+                "reviews": source.review_count,
+                "votes": source.voter_count,
+                "links": links,
+            }
+        )
+    if not payload_sources:
         return f'<td class="company">{shown}{badge}</td>'
     payload = json.dumps(
-        {
-            "name": name,
-            "rating": review.rating,
-            "reviews": review.review_count,
-            "votes": review.voter_count,
-            "links": links,
-        },
+        {"name": name, "rating": review.rating, "sources": payload_sources},
         ensure_ascii=False,
     )
     label = escape(t("company_open", name=name))
@@ -122,9 +125,57 @@ def _company_cell(item: StoredJob, t: Translator, *, actions: bool) -> str:
     return f'<td class="company">{button}{badge}</td>'
 
 
-def _dou_page(url: str) -> str:
-    parsed = urlsplit(url)
-    if parsed.scheme == "https" and parsed.hostname == "jobs.dou.ua" and not parsed.username:
+def _display_sources(review: CompanyReview | None) -> tuple[ReviewSource, ...]:
+    if review is None:
+        return ()
+    if review.sources:
+        return review.sources
+    if review.rating is None and not review.review_count:
+        return ()
+    score = f"{review.rating}/100" if review.rating is not None else ""
+    return (
+        ReviewSource(
+            source="DOU",
+            rating=review.rating,
+            score=score,
+            review_count=review.review_count,
+            voter_count=review.voter_count,
+            reviews_url=review.reviews_url,
+            poll_url=review.poll_url,
+        ),
+    )
+
+
+def _source_links(source: ReviewSource, t: Translator) -> list[dict[str, str]]:
+    links = []
+    reviews_url = _review_page(source.reviews_url)
+    poll_url = _review_page(source.poll_url)
+    if reviews_url and source.source == "DOU":
+        links.append({"href": reviews_url, "label": t("link_company_reviews")})
+    elif reviews_url and source.source == "Indeed":
+        links.append({"href": reviews_url, "label": t("link_indeed_reviews")})
+    if poll_url and source.source == "DOU":
+        links.append({"href": poll_url, "label": t("link_company_poll")})
+    return links
+
+
+_INDEED_REVIEWS = re.compile(r"/cmp/[A-Za-z0-9_-]+/reviews/?")
+
+
+def _review_page(url: str) -> str:
+    parsed = urlsplit(url or "")
+    if (
+        parsed.scheme != "https"
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+    ):
+        return ""
+    host = (parsed.hostname or "").lower()
+    if host == "jobs.dou.ua" and parsed.path.startswith("/companies/"):
+        return url
+    if host == "ua.indeed.com" and _INDEED_REVIEWS.fullmatch(parsed.path):
         return url
     return ""
 
@@ -138,7 +189,14 @@ def _rate_badge(review: CompanyReview, t: Translator) -> str:
         band = "mid"
     else:
         band = "low"
-    hint = escape(t("company_rate_hint", n=review.rating))
+    scored = [source.source for source in _display_sources(review) if source.rating is not None]
+    if scored == ["Indeed"]:
+        hint_key = "company_rate_hint_indeed"
+    elif len(scored) > 1:
+        hint_key = "company_rate_hint_avg"
+    else:
+        hint_key = "company_rate_hint"
+    hint = escape(t(hint_key, n=review.rating))
     return (
         f'<span class="crate crate-{band}" title="{hint}" aria-label="{hint}">'
         f"{review.rating}</span>"

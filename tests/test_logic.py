@@ -32,7 +32,9 @@ class TestBrowserCheck:
     def test_human_check_is_recognized(self):
         assert asks_for_human("Just a moment...", "Verify you are human")
         assert asks_for_human("", "Підтвердьте, що ви людина")
+        assert asks_for_human("Additional Verification Required")
         assert is_browser_check("Just a moment...")
+        assert is_browser_check("", "Humans only")
         assert not (asks_for_human("Just a moment..."))
         assert not (is_browser_check("Python Developer — Jooble"))
 

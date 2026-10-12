@@ -123,8 +123,8 @@ CSS = """
       color: var(--blue); border-color: var(--blue-soft); font-size: 0.7rem; font-weight: 700;
     }
     .swatch.sw-rate {
-      width: auto; height: auto; padding: 0 5px; background: var(--green-soft);
-      color: var(--green); border-color: var(--green-soft); font-size: 0.7rem; font-weight: 700;
+      width: auto; height: auto; padding: 0; background: none; border: 0;
+      color: var(--green); font-size: 0.82rem; font-weight: 500;
     }
     .table-wrap { border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
     tbody tr[hidden] { display: none; }
@@ -160,36 +160,37 @@ CSS = """
     .title { font-weight: 600; }
     button.company-open {
       background: none; color: inherit; border: 0; border-radius: 0; padding: 0;
-      font: inherit; font-weight: 600; text-align: left; cursor: pointer; display: inline;
-      text-decoration: underline; text-underline-offset: 2px;
+      font: inherit; font-weight: inherit; text-align: left; cursor: pointer; display: inline;
     }
     button.company-open:hover { color: var(--green); }
     .crate {
-      display: inline-block; margin-left: 6px; border-radius: 999px; padding: 0 6px;
-      font-size: 0.78rem; font-weight: 700; vertical-align: 1px; white-space: nowrap;
+      margin-left: 0.4em; font-size: 0.82em; font-weight: 500;
+      font-variant-numeric: tabular-nums; white-space: nowrap;
     }
-    .crate-good { background: var(--green-soft); color: var(--green); }
-    .crate-mid { background: var(--amber-soft); color: var(--amber); }
-    .crate-low { background: var(--red-soft); color: var(--red); }
+    .crate-good { color: var(--green); }
+    .crate-mid { color: var(--amber); }
+    .crate-low { color: var(--red); }
     dialog#company-reviews {
       border: 0; border-radius: 12px; padding: 0; color: var(--ink); background: var(--card);
-      width: min(32rem, calc(100vw - 24px)); max-height: calc(100dvh - 24px);
+      width: min(28rem, calc(100vw - 24px)); max-height: calc(100dvh - 24px);
     }
     dialog#company-reviews::backdrop { background: rgba(28, 25, 21, 0.45); }
     .company-dialog { padding: 16px 18px 18px; }
     .company-dialog-head {
       display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
     }
-    .company-dialog h2 { margin: 0; font-size: 1.25rem; line-height: 1.3; }
-    .company-rate { margin: 12px 0 0; font-size: 1.35rem; font-weight: 700; }
+    .company-dialog h2 { margin: 0; font-size: 1.15rem; line-height: 1.3; }
+    .company-rate { margin: 8px 0 0; font-size: 1.15rem; font-weight: 700; }
     .company-rate.good { color: var(--green); }
     .company-rate.mid { color: var(--amber); }
     .company-rate.low { color: var(--red); }
-    .company-votes, .company-count { margin: 4px 0 0; color: var(--muted); }
-    .company-none { margin: 12px 0 0; }
-    .company-links { margin: 12px 0; padding-left: 18px; }
+    .company-none { margin: 10px 0 0; }
+    .company-sources { list-style: none; margin: 10px 0 0; padding: 0; }
+    .company-source + .company-source { margin-top: 8px; }
+    .company-source-line, .company-links { margin: 0; color: var(--muted); font-size: 0.92rem; }
+    .company-links { margin-top: 2px; }
     .company-links a { font-weight: 600; }
-    .company-dialog .note { margin: 0; }
+    .company-dialog .note { margin: 14px 0 0; }
     .meta { color: var(--muted); font-size: 0.88rem; margin-top: 3px; }
     .meta a.board { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
     .meta a.board:hover { color: var(--green); }

@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
-from core.models import CompanyReview
+from core.models import CompanyReview, ReviewSource
 from jobs.refresh import CatalogService
 from storage.catalog import Catalog
 from storage.filters import CatalogFilters
@@ -215,6 +215,19 @@ def _review_json(review: CompanyReview | None) -> dict | None:
         "reviews_url": review.reviews_url,
         "poll_url": review.poll_url,
         "profile_url": review.profile_url,
+        "sources": [_source_json(source) for source in review.sources],
+    }
+
+
+def _source_json(source: ReviewSource) -> dict:
+    return {
+        "source": source.source,
+        "rating": source.rating,
+        "score": source.score,
+        "review_count": source.review_count,
+        "voter_count": source.voter_count,
+        "reviews_url": source.reviews_url,
+        "poll_url": source.poll_url,
     }
 
 

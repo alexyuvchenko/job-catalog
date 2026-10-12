@@ -16,11 +16,16 @@ _TICK_MS = 1500
 _CHALLENGE = (
     "just a moment",
     "verify you are human",
+    "humans only",
+    "additional verification",
+    "unusual traffic",
     "перевірка надійності",
     "підтвердьте, що ви людина",
 )
 _HUMAN = (
     "verify you are human",
+    "humans only",
+    "additional verification",
     "підтвердьте, що ви людина",
 )
 
@@ -100,10 +105,11 @@ class Browser:
     def __exit__(self, *_) -> None:
         self.close()
 
-    def goto(self, url: str, selector: str | None = None) -> None:
+    def goto(self, url: str, selector: str | None = None, *, human: bool | None = None) -> None:
         assert self.page is not None
+        wait_for_person = self.interactive if human is None else human
         self.page.goto(url, wait_until="domcontentloaded")
-        self._wait_for_check(url, selector)
+        self._wait_for_check(url, selector, wait_for_person)
         if selector:
             try:
                 self.page.wait_for_selector(selector, timeout=8000)
@@ -111,7 +117,7 @@ class Browser:
                 # An empty results page is still a successful load.
                 return
 
-    def _wait_for_check(self, url: str, selector: str | None) -> None:
+    def _wait_for_check(self, url: str, selector: str | None, wait_for_person: bool) -> None:
         assert self.page is not None
         ticks = 0
         limit = _AUTO_TICKS
@@ -121,7 +127,7 @@ class Browser:
                 if self.cancelled is not None and self.cancelled():
                     raise FetchError("refresh stopped during the site check")
                 if ticks >= _AUTO_TICKS or self._asks_for_human():
-                    if not self.interactive:
+                    if not wait_for_person:
                         raise FetchError(
                             "the page is asking to verify you are human; "
                             "start refresh with the button when you are at the computer"
@@ -225,4 +231,6 @@ def _host(url: str) -> str:
         return "Work.ua"
     if "robota.ua" in host:
         return "Robota.ua"
+    if "indeed.com" in host:
+        return "Indeed"
     return host or url

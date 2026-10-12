@@ -165,8 +165,8 @@ _TEXT: dict[str, dict[str, str]] = {
         "en": "grey background — you already opened it",
     },
     "legend_company": {
-        "uk": "число біля компанії — оцінка співробітників на DOU зі 100",
-        "en": "number by the company — DOU employee score out of 100",
+        "uk": "число біля компанії — середня оцінка співробітників зі 100",
+        "en": "number by the company — average employee score out of 100",
     },
     "company_open": {"uk": "Відгуки про {name}", "en": "Reviews of {name}"},
     "company_rate": {"uk": "{n} зі 100", "en": "{n} out of 100"},
@@ -174,19 +174,28 @@ _TEXT: dict[str, dict[str, str]] = {
         "uk": "Оцінка співробітників на DOU: {n} зі 100",
         "en": "DOU employee score: {n} out of 100",
     },
+    "company_rate_hint_indeed": {
+        "uk": "Оцінка співробітників на Indeed: {n} зі 100",
+        "en": "Indeed employee score: {n} out of 100",
+    },
+    "company_rate_hint_avg": {
+        "uk": "Середня оцінка співробітників: {n} зі 100",
+        "en": "Average employee score: {n} out of 100",
+    },
     "company_votes": {"uk": "Проголосувало {n}", "en": "{n} employees voted"},
     "company_review_count": {"uk": "{n} відгуків", "en": "{n} reviews"},
     "company_no_score": {
-        "uk": "Оцінки співробітників на DOU немає.",
-        "en": "DOU has no employee score for this company.",
+        "uk": "Числової оцінки співробітників немає.",
+        "en": "There is no numeric employee score.",
     },
     "company_note": {
-        "uk": "Число — це оцінка з анкети співробітників на DOU. Посилання відкривають відгуки і анкету. DOU не перевіряє кожен відгук, і ця оцінка не підтверджує бронювання.",
-        "en": "The number is the DOU employee survey score. The links open the written reviews and the survey. DOU does not check each review, and this score does not confirm reservation (бронювання).",
+        "uk": "DOU — анкета зі 100, Indeed — зірки з 5. Середнє в таблиці — зі 100. Це не підтверджує бронювання.",
+        "en": "DOU is a survey out of 100, Indeed is stars out of 5. The table average is out of 100. This does not confirm reservation (бронювання).",
     },
     "company_close": {"uk": "Закрити", "en": "Close"},
     "link_company_reviews": {"uk": "Відгуки на DOU", "en": "Reviews on DOU"},
     "link_company_poll": {"uk": "Анкета співробітників", "en": "Employee survey"},
+    "link_indeed_reviews": {"uk": "Відгуки на Indeed", "en": "Reviews on Indeed"},
     # Paging
     "showing": {
         "uk": "Показано {first}–{last} із {total}",

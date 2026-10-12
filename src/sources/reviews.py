@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 import urllib.parse
 
-from core.models import CompanyReview
+from core.models import CompanyReview, ReviewSource
 from network.client import Client
 
 _CARD = re.compile(r'<li class="l-company">(.*?)</li>', re.S)
@@ -65,7 +65,7 @@ def slug_from_url(url: str) -> str:
 
 def match_slug(html: str, name: str) -> str | None:
     """The one company card whose title matches ``name``. Several matches are left unused."""
-    wanted = _match_key(name)
+    wanted = match_key(name)
     if not wanted:
         return None
     found: list[str] = []
@@ -74,7 +74,7 @@ def match_slug(html: str, name: str) -> str | None:
         if name_match is None:
             continue
         slug, label = name_match.group(1), _text(name_match.group(2))
-        if _SLUG_TEXT.fullmatch(slug) is None or _match_key(label) != wanted:
+        if _SLUG_TEXT.fullmatch(slug) is None or match_key(label) != wanted:
             continue
         if slug not in found:
             found.append(slug)
@@ -98,13 +98,27 @@ def parse_reviews_page(html: str, slug: str) -> CompanyReview | None:
     votes_match = _VOTES.search(html)
     voter_count = int(votes_match.group(1)) if votes_match else 0
     base = f"https://jobs.dou.ua/companies/{slug}/"
+    reviews_url = base + "reviews/" if review_count else ""
+    poll_url = base + "poll/" if rating is not None else ""
+    score = f"{rating}/100" if rating is not None else ""
     return CompanyReview(
         rating=rating,
         review_count=review_count,
         voter_count=voter_count,
-        reviews_url=base + "reviews/" if review_count else "",
-        poll_url=base + "poll/" if rating is not None else "",
+        reviews_url=reviews_url,
+        poll_url=poll_url,
         profile_url=base,
+        sources=(
+            ReviewSource(
+                source="DOU",
+                rating=rating,
+                score=score,
+                review_count=review_count,
+                voter_count=voter_count,
+                reviews_url=reviews_url,
+                poll_url=poll_url,
+            ),
+        ),
     )
 
 
@@ -116,7 +130,7 @@ def _find_slug(client: Client, name: str) -> str | None:
     return match_slug(html, name)
 
 
-def _match_key(name: str) -> str:
+def match_key(name: str) -> str:
     folded = name.casefold().replace("\xa0", " ").replace("-", " ")
     folded = re.sub(r"[^\w\s]", " ", folded, flags=re.UNICODE)
     tokens = folded.split()

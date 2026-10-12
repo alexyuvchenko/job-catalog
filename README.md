@@ -67,7 +67,7 @@ The local service keeps the remote engineering list and refreshes it on its own.
 - a vacancy that disappeared from a site that responded in full is marked inactive
 - if a site fails, or only some of its pages load, the vacancies it already had stay, and the ones it returned are still added or updated
 - the same title at the same company on more than one board is one row, with a link for each board
-- each active company is looked up on DOU. A matching company page, or a DOU company link already on the vacancy, is saved with the employee survey score (out of 100) and links to the written reviews and the survey. A score already saved stays when DOU does not answer. A found company is read again after a week, and a company that was not found is tried again the next day
+- each active company is looked up on DOU and on Indeed. DOU contributes its employee survey (out of 100) and links to the written reviews and the survey. Indeed contributes its employee star rating (out of 5, also stored out of 100) and a link to those reviews. A company name is used only when one listing matches; if Indeed has several companies with that name, the information-technology one is used when it is the only such listing. The number in the table is the average of the scores found. A score already saved for a source stays when that source does not answer. A company found on every source that was asked is read again after a week. A company that was missing, only partly read, or failed is tried again the next day. Indeed opens in the same off-screen Chrome as Work.ua and Robota.ua. A human check on Indeed is not waited out: that source is skipped for the rest of the refresh, and DOU is still saved. If Chrome does not start, the DOU score is still saved
 
 ```bash
 uv run job-catalog --serve
@@ -97,7 +97,7 @@ The chips above the list show how each site did in the last saved refresh:
 
 In the reservation column, «підтверджено» (“confirmed”) means the site or its badge states the reservation. «без бейджа» (“no badge”) means the DOU vacancy page could not be checked. «знято» (“closed”) means the vacancy is no longer listed at its source.
 
-A number next to the company name is DOU’s employee survey score out of 100. It is not a check of бронювання. The company name opens a dialog with links to the written reviews and the survey on DOU. Companies DOU does not list have no number. Written reviews have no score of their own, so the number is the survey, and the dialog is where the review links are.
+A number next to the company name is the average of the employee scores found, on a scale of 100. DOU’s score is its employee survey. Indeed’s score is its star rating, converted from 5 stars. It is not a check of бронювання. The company name opens a dialog that lists each source with its own score and links. A company with no saved score has no number. Written reviews on DOU have no score of their own, so that source’s number is the survey.
 
 ### Language
 
@@ -190,7 +190,7 @@ The catalog, marks, filters, and refresh require a signed-in session. Pages redi
 | `GET /` | The catalog page. Without a session, this redirects to `/login`. With a session and no filter query, it opens the account’s saved filters. `/?reset=1` clears them. |
 | `GET /health` | Whether a refresh is running, stored job and account counts, the last finish time, and the last error. `GET /api/status` is the same. It answers 503 when the database cannot be read. |
 | `GET /?page=2&per_page=100` | A page of the list. `per_page` is 25, 50, 100, or 200. Other values fall back to the default. |
-| `GET /api/jobs` | The filtered list as JSON, not paged. It adds `active`, `change`, `changes`, `language`, `favorite`, `hidden`, `rating`, `viewed`, `listings` (each board URL for this title and company), and `company_review` to each vacancy. `company_review` is `null` or `{rating, review_count, voter_count, reviews_url, poll_url, profile_url}`. `rating` there is the DOU employee score out of 100, not your own star mark. Query parameters match the page: `q`, `source`, `min_salary`, `english`, `min_years`, `full_remote_only`, `include_inactive`, `mine` (`all`, `favorites`, `unviewed`, `viewed`, `rated`, `hidden`), `min_rating`, `change` (`added`, `changed`, `closed`), `language` (`en`, `uk`), `sort` (`date`, `job`, `company`), `dir` (`asc`, `desc`). |
+| `GET /api/jobs` | The filtered list as JSON, not paged. It adds `active`, `change`, `changes`, `language`, `favorite`, `hidden`, `rating`, `viewed`, `listings` (each board URL for this title and company), and `company_review` to each vacancy. `company_review` is `null` or `{rating, review_count, voter_count, reviews_url, poll_url, profile_url, sources}`. `rating` there is the average employee score out of 100, not your own star mark. `sources` lists each site: `source` (`DOU` or `Indeed`), that site’s `rating` out of 100, `score` as published (`82/100` or `4.5/5`), `review_count`, `voter_count`, `reviews_url`, and `poll_url`. `reviews_url` and `poll_url` on the object itself are the DOU links. Query parameters match the page: `q`, `source`, `min_salary`, `english`, `min_years`, `full_remote_only`, `include_inactive`, `mine` (`all`, `favorites`, `unviewed`, `viewed`, `rated`, `hidden`), `min_rating`, `change` (`added`, `changed`, `closed`), `language` (`en`, `uk`), `sort` (`date`, `job`, `company`), `dir` (`asc`, `desc`). |
 | `POST /api/jobs/state` | Saves your marks. JSON body: `url` and any of `favorite`, `hidden`, `rating` (0 to 5), `viewed`. Omitted fields stay as they are. Answers with the stored marks, or 404 for an unknown vacancy. Only accepted from the page's own origin. |
 | `GET /fragments/rows` | The next rows as JSON for «Показати ще». Takes the same query as the page. |
 | `GET /docs` | Interactive API docs. |
@@ -203,7 +203,7 @@ The database is `data/catalog.sqlite`. `data/` and `out/` are local state. After
 The code is in `src/` (an application, not a library), with tests in `tests/`.
 
 - `core` — models, classification (remote, salary, English, language), constants, paths, logging
-- `sources` — one module per job board, plus DOU company reviews (`reviews.py`)
+- `sources` — one module per job board, plus company reviews (`reviews.py` for DOU, `indeed.py` for Indeed)
 - `network` — page fetch and off-screen Chrome
 - `storage` — the SQLite catalog (`catalog.py`), its filters and sorting (`filters.py`), returned records (`records.py`), and shared SQLite settings (`sqlite.py`)
 - `jobs` — the refresh loop (`refresh.py`) and the one-off search (`search.py`)

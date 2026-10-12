@@ -100,7 +100,9 @@ class CatalogService:
                 stats.deactivated,
             )
             try:
-                update_company_reviews(self.catalog, cancelled=self._stop.is_set)
+                update_company_reviews(
+                    self.catalog, cancelled=self._stop.is_set, interactive=interactive
+                )
             except Exception as exc:
                 log.exception("company reviews were not updated")
                 self.last_error = f"catalog was saved, but company reviews were not updated: {exc}"[

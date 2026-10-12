@@ -128,25 +128,25 @@ class TestHumanCheckWait:
     def test_unattended_run_fails_fast_and_never_opens_a_window(self):
         browser, moves = _browser(["Verify you are human"] * 50, interactive=False)
         with pytest.raises(FetchError):
-            browser._wait_for_check("https://ua.jooble.org/", None)
+            browser._wait_for_check("https://ua.jooble.org/", None, False)
         assert moves == []
 
     def test_attended_run_waits_then_hides_the_window_again(self):
         browser, moves = _browser(["Verify you are human"] * 3 + ["Python Developer"])
-        browser._wait_for_check("https://ua.jooble.org/", None)
+        browser._wait_for_check("https://ua.jooble.org/", None, True)
         assert moves == [(80, 80), (-2400, -2400)]
 
     def test_waiting_gives_up_and_hides_the_window(self):
         browser, moves = _browser(["Verify you are human"] * 1000)
         with pytest.raises(FetchError):
-            browser._wait_for_check("https://ua.jooble.org/", None)
+            browser._wait_for_check("https://ua.jooble.org/", None, True)
         assert moves[-1] == (-2400, -2400)
 
     def test_a_stopped_refresh_does_not_keep_waiting(self):
         browser, moves = _browser(["Verify you are human"] * 1000)
         browser.cancelled = lambda: True
         with pytest.raises(FetchError) as caught:
-            browser._wait_for_check("https://ua.jooble.org/", None)
+            browser._wait_for_check("https://ua.jooble.org/", None, True)
         assert "stopped" in str(caught.value)
         assert moves == []
 

@@ -105,26 +105,32 @@ CATALOG_JS = """
       node.textContent = text || "";
     };
     show(rate, data.rating == null ? "" : fill(i18n.companyRate, { n: data.rating }));
-    show(
-      dialog.querySelector(".company-votes"),
-      data.votes ? fill(i18n.companyVotes, { n: data.votes }) : ""
-    );
-    show(
-      dialog.querySelector(".company-count"),
-      data.reviews ? fill(i18n.companyReviews, { n: data.reviews }) : ""
-    );
     dialog.querySelector(".company-none").hidden = data.rating != null;
-    const list = dialog.querySelector(".company-links");
-    list.replaceChildren();
-    (data.links || []).forEach((link) => {
-      const item = document.createElement("li");
-      const anchor = document.createElement("a");
-      anchor.href = link.href;
-      anchor.target = "_blank";
-      anchor.rel = "noopener noreferrer";
-      anchor.textContent = link.label;
-      item.append(anchor);
-      list.append(item);
+    const sources = dialog.querySelector(".company-sources");
+    sources.replaceChildren();
+    (data.sources || []).forEach((source) => {
+      const block = document.createElement("li");
+      block.className = "company-source";
+      const line = document.createElement("p");
+      line.className = "company-source-line";
+      const bits = [source.name, source.score].filter(Boolean);
+      if (source.votes) bits.push(fill(i18n.companyVotes, { n: source.votes }));
+      if (source.reviews) bits.push(fill(i18n.companyReviews, { n: source.reviews }));
+      line.textContent = bits.join(" · ");
+      block.append(line);
+      const list = document.createElement("p");
+      list.className = "company-links";
+      (source.links || []).forEach((link, index) => {
+        if (index) list.append(" · ");
+        const anchor = document.createElement("a");
+        anchor.href = link.href;
+        anchor.target = "_blank";
+        anchor.rel = "noopener noreferrer";
+        anchor.textContent = link.label;
+        list.append(anchor);
+      });
+      block.append(list);
+      sources.append(block);
     });
     dialog.showModal();
   };

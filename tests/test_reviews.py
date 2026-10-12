@@ -1,13 +1,16 @@
-"""DOU company reviews: parsing, catalog storage, and the company dialog."""
+"""DOU and Indeed company reviews: parsing, catalog storage, and the company dialog."""
 
+import json
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from tests.support import sign_in
 
-from core.models import CompanyReview, Job, SourceStatus
+from core.models import CompanyReview, Job, ReviewSource, SourceStatus
 from jobs.refresh import CatalogService
+from jobs.reviews import combine_reviews, update_company_reviews
 from network.client import FetchError
+from sources.indeed import parse_indeed_search
 from sources.reviews import fetch_company_review, match_slug, parse_reviews_page, slug_from_url
 from storage.catalog import Catalog
 from storage.filters import CatalogFilters
@@ -34,6 +37,32 @@ _REVIEWS = """
 """
 
 _REVIEWS_ONLY = '<h3 id="lblCommentsCount">3 відгуки</h3>'
+
+MACPAW = [
+    {
+        "name": "MacPaw",
+        "rating": 4.5,
+        "reviewsCount": 2,
+        "reviewsUrl": "/cmp/Macpaw/reviews",
+        "sectors": ["Інформаційні технології"],
+    }
+]
+SOFTSERVE = [
+    {
+        "name": "SoftServe",
+        "rating": 4.1,
+        "reviewsCount": 88,
+        "reviewsUrl": "/cmp/Softserve/reviews",
+        "sectors": ["Інформаційні технології"],
+    },
+    {
+        "name": "SoftServe",
+        "rating": 5,
+        "reviewsCount": 1,
+        "reviewsUrl": "/cmp/Softserve-5/reviews",
+        "sectors": ["Освіта"],
+    },
+]
 
 
 class _Client:
@@ -74,6 +103,17 @@ def test_reviews_page_keeps_the_survey_score_and_links():
         reviews_url="https://jobs.dou.ua/companies/macpaw/reviews/",
         poll_url="https://jobs.dou.ua/companies/macpaw/poll/",
         profile_url="https://jobs.dou.ua/companies/macpaw/",
+        sources=(
+            ReviewSource(
+                source="DOU",
+                rating=82,
+                score="82/100",
+                review_count=40,
+                voter_count=45,
+                reviews_url="https://jobs.dou.ua/companies/macpaw/reviews/",
+                poll_url="https://jobs.dou.ua/companies/macpaw/poll/",
+            ),
+        ),
     )
     comments = parse_reviews_page(_REVIEWS_ONLY, "macpaw")
     assert comments is not None
@@ -175,6 +215,7 @@ def test_refresh_saves_reviews_and_a_failed_lookup_does_not_drop_the_vacancy(tmp
     with (
         patch("jobs.refresh.run_search", return_value=([job], [status])),
         patch("jobs.refresh.write_outputs"),
+        patch("jobs.reviews._open_browser", return_value=None),
         patch("jobs.reviews.fetch_company_review", return_value=review) as fetch,
     ):
         stats = service.refresh()
@@ -191,6 +232,7 @@ def test_refresh_saves_reviews_and_a_failed_lookup_does_not_drop_the_vacancy(tmp
     with (
         patch("jobs.refresh.run_search", return_value=([job], [status])),
         patch("jobs.refresh.write_outputs"),
+        patch("jobs.reviews._open_browser", return_value=None),
         patch("jobs.reviews.fetch_company_review", side_effect=FetchError("down")),
     ):
         failed = service.refresh()
@@ -233,6 +275,185 @@ def test_company_name_opens_a_dialog_with_the_score_and_links(tmp_path):
     sign_in(quiet, plain, username="bea")
     assert 'class="company-open"' not in quiet.get("/").text
     assert quiet.get("/api/jobs").json()[0]["company_review"] is None
+
+
+def test_indeed_human_check_skips_later_companies(tmp_path):
+    catalog = Catalog(tmp_path / "catalog.sqlite")
+    catalog.merge(
+        [
+            _job(company="MacPaw"),
+            _job(company="Other", url="https://example.com/2", job_id="2"),
+        ],
+        [SourceStatus("Djinni", True, "ok", fetched=2, kept=2)],
+        "2026-10-10 10:00:00",
+        "2026-10-10 10:01:00",
+    )
+    names: list[str] = []
+
+    def fake_indeed(_browser, name: str):
+        names.append(name)
+        raise FetchError("the page is asking to verify you are human")
+
+    class DummyBrowser:
+        closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    browser = DummyBrowser()
+    with (
+        patch("jobs.reviews.fetch_company_review", return_value=None),
+        patch("jobs.reviews.fetch_indeed_review", side_effect=fake_indeed),
+        patch("jobs.reviews._open_browser", return_value=browser),
+    ):
+        update_company_reviews(catalog)
+    assert names == ["MacPaw"]
+    assert browser.closed
+
+
+def test_indeed_uses_one_name_match_and_prefers_the_it_company_when_names_repeat():
+    macpaw = parse_indeed_search(_indeed(MACPAW), "MacPaw")
+    assert macpaw == ReviewSource(
+        source="Indeed",
+        rating=90,
+        score="4.5/5",
+        review_count=2,
+        voter_count=0,
+        reviews_url="https://ua.indeed.com/cmp/Macpaw/reviews",
+    )
+    softserve = parse_indeed_search(_indeed(SOFTSERVE), "SoftServe")
+    assert softserve is not None
+    assert softserve.reviews_url.endswith("/cmp/Softserve/reviews")
+    assert softserve.rating == 82
+    assert parse_indeed_search(_indeed(SOFTSERVE), "Nobody") is None
+    both_it = [dict(row, sectors=["Інформаційні технології"]) for row in SOFTSERVE]
+    assert parse_indeed_search(_indeed(both_it), "SoftServe") is None
+
+
+def test_indeed_without_search_results_is_a_failed_read():
+    try:
+        parse_indeed_search("<html></html>", "MacPaw")
+    except FetchError:
+        return
+    raise AssertionError("a page without Indeed results should fail the read")
+
+
+def test_a_failed_source_keeps_its_previous_score_and_the_other_source_is_averaged():
+    dou = parse_reviews_page(_REVIEWS, "macpaw")
+    assert dou is not None
+    indeed = ReviewSource(
+        source="Indeed",
+        rating=90,
+        score="4.5/5",
+        review_count=2,
+        voter_count=0,
+        reviews_url="https://ua.indeed.com/cmp/Macpaw/reviews",
+    )
+    merged, status = combine_reviews(None, dou, False, indeed, False)
+    assert status == "found"
+    assert merged is not None and merged.rating == 86
+    assert [source.source for source in merged.sources] == ["DOU", "Indeed"]
+
+    kept_indeed, indeed_down = combine_reviews(merged, dou, False, None, True)
+    assert indeed_down == "partial"
+    assert kept_indeed is not None and kept_indeed.rating == 86
+    assert [source.source for source in kept_indeed.sources] == ["DOU", "Indeed"]
+
+    kept, partial = combine_reviews(merged, None, True, None, False)
+    assert partial == "partial"
+    assert kept is not None
+    assert [source.source for source in kept.sources] == ["DOU"]
+    assert kept.rating == 82
+    assert kept.profile_url.endswith("/macpaw/")
+
+    unchanged, failed = combine_reviews(kept, None, True, None, True)
+    assert failed == "error" and unchanged is None
+
+
+def test_dialog_lists_indeed_beside_dou_and_drops_an_unsafe_link(tmp_path):
+    catalog = Catalog(tmp_path / "catalog.sqlite")
+    _merge(catalog, company="MacPaw")
+    dou = parse_reviews_page(_REVIEWS, "macpaw")
+    indeed = ReviewSource(
+        source="Indeed",
+        rating=90,
+        score="4.5/5",
+        review_count=2,
+        voter_count=0,
+        reviews_url="https://ua.indeed.com/cmp/Macpaw/reviews",
+    )
+    merged, status = combine_reviews(None, dou, False, indeed, False)
+    assert merged is not None
+    catalog.save_company_review(company_key("MacPaw"), "MacPaw", merged, status)
+    listed = catalog.list_jobs(CatalogFilters())[0]
+    assert listed.review is not None and listed.review.rating == 86
+    page = render_row(listed, translator("en"))
+    assert "crate-good" in page
+    assert ">86</span>" in page
+    assert "https://ua.indeed.com/cmp/Macpaw/reviews" in page
+    assert "Reviews on Indeed" in page
+    assert "Average employee score" in page
+    unsafe = ReviewSource(
+        source="Indeed",
+        rating=90,
+        score="4.5/5",
+        review_count=1,
+        voter_count=0,
+        reviews_url="https://evil.example/cmp/Macpaw/reviews",
+    )
+    poisoned = CompanyReview(
+        rating=90,
+        review_count=1,
+        voter_count=0,
+        reviews_url="",
+        poll_url="",
+        profile_url="",
+        sources=(unsafe,),
+    )
+    cell = render_row(
+        StoredJob(job=_job(), active=True, first_seen="", last_seen="", review=poisoned),
+        translator("en"),
+    )
+    assert "evil.example" not in cell
+    assert "company-open" not in cell
+
+
+def test_an_older_dou_row_still_shows_after_the_sources_column_is_added(tmp_path):
+    catalog = Catalog(tmp_path / "catalog.sqlite")
+    _merge(catalog, company="MacPaw")
+    review = parse_reviews_page(_REVIEWS, "macpaw")
+    key = company_key("MacPaw")
+    catalog.save_company_review(key, "MacPaw", review, "found")
+    connection = connect(catalog.path)
+    connection.execute("UPDATE company_reviews SET sources_json = '' WHERE company_key = ?", (key,))
+    connection.commit()
+    connection.close()
+    listed = catalog.list_jobs(CatalogFilters())[0].review
+    assert listed is not None
+    assert listed.sources[0].source == "DOU"
+    assert listed.sources[0].score == "82/100"
+
+
+def test_a_partial_read_is_tried_again_the_next_day(tmp_path):
+    catalog = Catalog(tmp_path / "catalog.sqlite")
+    _merge(catalog, company="MacPaw")
+    review = parse_reviews_page(_REVIEWS, "macpaw")
+    key = company_key("MacPaw")
+    catalog.save_company_review(key, "MacPaw", review, "partial")
+    assert catalog.companies_due() == []
+    connection = connect(catalog.path)
+    connection.execute(
+        "UPDATE company_reviews SET checked_at = ? WHERE company_key = ?",
+        ("2026-10-11 00:00:00", key),
+    )
+    connection.commit()
+    connection.close()
+    assert [item.name for item in catalog.companies_due()] == ["MacPaw"]
+
+
+def _indeed(results: list[dict]) -> str:
+    payload = json.dumps({"searchResults": results}, ensure_ascii=False)
+    return f'<script id="comp-initialData" type="application/json">{payload}</script>'
 
 
 def _merge(catalog: Catalog, company: str = "Example", company_url: str = "") -> None:

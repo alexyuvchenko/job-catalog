@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta
@@ -7,7 +8,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from core.classify import detect_language
-from core.models import CompanyReview, Job, SourceStatus
+from core.models import CompanyReview, Job, ReviewSource, SourceStatus
 from core.paths import CATALOG_PATH
 from storage.filters import MAX_RATING, CatalogFilters, apply_sort, is_visible
 from storage.group import company_key, group_same_positions, position_key_parts
@@ -169,7 +170,7 @@ class Catalog:
         return grouped
 
     def companies_due(self) -> list[CompanyTarget]:
-        """Active companies whose DOU review is missing or old enough to read again."""
+        """Active companies whose reviews are missing or old enough to read again."""
         with self._session() as connection:
             jobs = connection.execute(
                 "SELECT company, company_url FROM jobs WHERE active = 1"
@@ -206,6 +207,17 @@ class Catalog:
         due.sort(key=lambda item: item.key)
         return due
 
+    def saved_company_review(self, key: str) -> CompanyReview | None:
+        """The review already stored for this company, including one kept after a failed read."""
+        with self._session() as connection:
+            row = connection.execute(
+                "SELECT * FROM company_reviews WHERE company_key = ?",
+                (key,),
+            ).fetchone()
+        if row is None:
+            return None
+        return _review_from_row(row)
+
     def save_company_review(
         self,
         key: str,
@@ -213,8 +225,8 @@ class Catalog:
         review: CompanyReview | None,
         status: str,
     ) -> None:
-        """Store a DOU lookup. A failed read keeps a score that was already saved."""
-        if status not in {"found", "missing", "error"}:
+        """Store a company lookup. A failed read keeps a score that was already saved."""
+        if status not in {"found", "partial", "missing", "error"}:
             raise ValueError(f"unknown review status {status}")
         stamp = now_stamp()
         with self._session() as connection:
@@ -223,14 +235,14 @@ class Catalog:
                     """
                     INSERT INTO company_reviews (
                         company_key, name, rating, review_count, voter_count,
-                        reviews_url, poll_url, profile_url, status, checked_at
-                    ) VALUES (?, ?, NULL, 0, 0, '', '', '', 'error', ?)
+                        reviews_url, poll_url, profile_url, sources_json, status, checked_at
+                    ) VALUES (?, ?, NULL, 0, 0, '', '', '', '[]', 'error', ?)
                     ON CONFLICT(company_key) DO UPDATE SET checked_at = excluded.checked_at
                     """,
                     (key, name, stamp),
                 )
                 return
-            if status == "found" and review is None:
+            if status in {"found", "partial"} and review is None:
                 status = "missing"
             rating = None if review is None else review.rating
             review_count = 0 if review is None else review.review_count
@@ -238,12 +250,13 @@ class Catalog:
             reviews_url = "" if review is None else review.reviews_url
             poll_url = "" if review is None else review.poll_url
             profile_url = "" if review is None else review.profile_url
+            sources_json = "[]" if review is None else _dump_sources(review.sources)
             connection.execute(
                 """
                 INSERT INTO company_reviews (
                     company_key, name, rating, review_count, voter_count,
-                    reviews_url, poll_url, profile_url, status, checked_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    reviews_url, poll_url, profile_url, sources_json, status, checked_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(company_key) DO UPDATE SET
                     name = excluded.name,
                     rating = excluded.rating,
@@ -252,6 +265,7 @@ class Catalog:
                     reviews_url = excluded.reviews_url,
                     poll_url = excluded.poll_url,
                     profile_url = excluded.profile_url,
+                    sources_json = excluded.sources_json,
                     status = excluded.status,
                     checked_at = excluded.checked_at
                 """,
@@ -264,6 +278,7 @@ class Catalog:
                     reviews_url,
                     poll_url,
                     profile_url,
+                    sources_json,
                     status,
                     stamp,
                 ),
@@ -706,6 +721,7 @@ class Catalog:
                 reviews_url TEXT NOT NULL DEFAULT '',
                 poll_url TEXT NOT NULL DEFAULT '',
                 profile_url TEXT NOT NULL DEFAULT '',
+                sources_json TEXT NOT NULL DEFAULT '',
                 status TEXT NOT NULL,
                 checked_at TEXT NOT NULL
             );
@@ -725,6 +741,13 @@ class Catalog:
         for name in ("changed_at", "changes", "closed_at"):
             if name not in job_columns:
                 connection.execute(f"ALTER TABLE jobs ADD COLUMN {name} TEXT NOT NULL DEFAULT ''")
+        review_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(company_reviews)")
+        }
+        if "sources_json" not in review_columns:
+            connection.execute(
+                "ALTER TABLE company_reviews ADD COLUMN sources_json TEXT NOT NULL DEFAULT ''"
+            )
         _migrate_marks(connection)
         connection.commit()
 
@@ -770,20 +793,109 @@ def _migrate_marks(connection: sqlite3.Connection) -> None:
 def _reviews_by_key(connection: sqlite3.Connection) -> dict[str, CompanyReview]:
     """Saved scores worth showing. A company with neither a score nor reviews is left out."""
     found: dict[str, CompanyReview] = {}
-    for row in connection.execute("SELECT * FROM company_reviews WHERE status = 'found'"):
-        rating = None if row["rating"] is None else int(row["rating"])
-        review_count = int(row["review_count"])
-        if rating is None and not review_count:
-            continue
-        found[row["company_key"]] = CompanyReview(
+    rows = connection.execute("SELECT * FROM company_reviews WHERE status IN ('found', 'partial')")
+    for row in rows:
+        review = _review_from_row(row)
+        if review is not None:
+            found[row["company_key"]] = review
+    return found
+
+
+def _review_from_row(row: sqlite3.Row) -> CompanyReview | None:
+    sources = _sources_from_row(row)
+    if not sources:
+        return None
+    rating = None if row["rating"] is None else int(row["rating"])
+    return CompanyReview(
+        rating=rating,
+        review_count=int(row["review_count"]),
+        voter_count=int(row["voter_count"]),
+        reviews_url=row["reviews_url"],
+        poll_url=row["poll_url"],
+        profile_url=row["profile_url"],
+        sources=sources,
+    )
+
+
+def _sources_from_row(row: sqlite3.Row) -> tuple[ReviewSource, ...]:
+    raw = row["sources_json"] if "sources_json" in row.keys() else ""
+    if not raw:
+        return _legacy_sources(row)
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return _legacy_sources(row)
+    if not isinstance(payload, list):
+        return _legacy_sources(row)
+    sources = []
+    for item in payload:
+        source = _source_from_json(item)
+        if source is not None:
+            sources.append(source)
+    return tuple(sources)
+
+
+def _legacy_sources(row: sqlite3.Row) -> tuple[ReviewSource, ...]:
+    """A score saved before Indeed was added is a DOU survey score."""
+    rating = None if row["rating"] is None else int(row["rating"])
+    review_count = int(row["review_count"])
+    reviews_url = row["reviews_url"] or ""
+    poll_url = row["poll_url"] or ""
+    if rating is None and not review_count and not reviews_url and not poll_url:
+        return ()
+    score = f"{rating}/100" if rating is not None else ""
+    return (
+        ReviewSource(
+            source="DOU",
             rating=rating,
+            score=score,
             review_count=review_count,
             voter_count=int(row["voter_count"]),
-            reviews_url=row["reviews_url"],
-            poll_url=row["poll_url"],
-            profile_url=row["profile_url"],
-        )
-    return found
+            reviews_url=reviews_url,
+            poll_url=poll_url,
+        ),
+    )
+
+
+def _source_from_json(item) -> ReviewSource | None:
+    if not isinstance(item, dict) or item.get("source") not in {"DOU", "Indeed"}:
+        return None
+    rating = item.get("rating")
+    if rating is not None and (isinstance(rating, bool) or not isinstance(rating, int)):
+        return None
+    if rating is not None and not 0 <= rating <= 100:
+        return None
+    return ReviewSource(
+        source=str(item["source"]),
+        rating=rating,
+        score=str(item.get("score") or ""),
+        review_count=_json_count(item.get("review_count")),
+        voter_count=_json_count(item.get("voter_count")),
+        reviews_url=str(item.get("reviews_url") or ""),
+        poll_url=str(item.get("poll_url") or ""),
+    )
+
+
+def _json_count(value) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return 0
+    return value
+
+
+def _dump_sources(sources: tuple[ReviewSource, ...]) -> str:
+    payload = [
+        {
+            "source": source.source,
+            "rating": source.rating,
+            "score": source.score,
+            "review_count": source.review_count,
+            "voter_count": source.voter_count,
+            "reviews_url": source.reviews_url,
+            "poll_url": source.poll_url,
+        }
+        for source in sources
+    ]
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def _dou_company_url(url: str) -> str:

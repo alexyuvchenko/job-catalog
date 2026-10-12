@@ -50,12 +50,30 @@ class SourceStatus:
     complete: bool = True
 
 
+@dataclass(frozen=True)
+class ReviewSource:
+    """One public employee-review page.
+
+    ``rating`` is that source's score converted to a scale of 100. ``score`` is
+    the number as the site publishes it, such as ``82/100`` or ``4.5/5``.
+    """
+
+    source: str
+    rating: int | None
+    score: str
+    review_count: int
+    voter_count: int
+    reviews_url: str
+    poll_url: str = ""
+
+
 @dataclass
 class CompanyReview:
-    """DOU's published company score and the pages it comes from.
+    """Employee scores saved for one company.
 
-    ``rating`` is the employee survey out of 100. Written reviews have no
-    numeric mark of their own, so they are linked instead of rescored.
+    ``rating`` is the average of the source scores that have a number, still
+    out of 100. Written reviews are linked. The average is not a check of
+    reservation (бронювання).
     """
 
     rating: int | None
@@ -64,3 +82,4 @@ class CompanyReview:
     reviews_url: str
     poll_url: str
     profile_url: str
+    sources: tuple[ReviewSource, ...] = ()
