@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from html import escape
+from urllib.parse import urlsplit
 
+from core.models import CompanyReview
 from storage.filters import MAX_RATING
 from storage.records import StoredJob
 from web.frontend.i18n import Translator
@@ -65,7 +68,6 @@ def render_row(item: StoredJob, t: Translator, *, actions: bool = True) -> str:
     if job.years is not None:
         number = str(int(job.years)) if job.years == int(job.years) else str(job.years)
         years = f" · {escape(t('years_experience', n=number))}"
-    company = escape(job.company) if job.company else "—"
     pay_class = "pay" if job.salary_text else "pay none"
     open_attrs = ' data-open target="_blank" rel="noopener noreferrer"' if actions else ""
     cells = [
@@ -73,7 +75,7 @@ def render_row(item: StoredJob, t: Translator, *, actions: bool = True) -> str:
         f'<td class="job"><a class="title" href="{escape(job.url)}"{open_attrs}>'
         f"{escape(job.title)}</a>{_tags(item, change, t)}"
         f'\n        <div class="meta">{_boards(item, open_attrs)}{category}{english}{years}</div></td>',
-        f'<td class="company">{company}</td>',
+        _company_cell(item, t, actions=actions),
         f'<td class="where">{escape(remote)}{location}</td>',
         f'<td class="{pay_class}">{escape(salary)}</td>',
         f'<td class="status">{_status(item, t)}</td>',
@@ -82,6 +84,65 @@ def render_row(item: StoredJob, t: Translator, *, actions: bool = True) -> str:
         cells.append(_mine(item, t))
     body = "\n      ".join(cells)
     return f"<tr{class_attr}{data}>\n      {body}\n    </tr>"
+
+
+def _company_cell(item: StoredJob, t: Translator, *, actions: bool) -> str:
+    name = item.job.company.strip()
+    shown = escape(name) if name else "—"
+    review = item.review
+    if review is None or (review.rating is None and not review.review_count):
+        return f'<td class="company">{shown}</td>'
+    badge = _rate_badge(review, t)
+    if not actions:
+        return f'<td class="company">{shown}{badge}</td>'
+    links = []
+    reviews_url = _dou_page(review.reviews_url)
+    poll_url = _dou_page(review.poll_url)
+    if reviews_url:
+        links.append({"href": reviews_url, "label": t("link_company_reviews")})
+    if poll_url:
+        links.append({"href": poll_url, "label": t("link_company_poll")})
+    if not links:
+        return f'<td class="company">{shown}{badge}</td>'
+    payload = json.dumps(
+        {
+            "name": name,
+            "rating": review.rating,
+            "reviews": review.review_count,
+            "votes": review.voter_count,
+            "links": links,
+        },
+        ensure_ascii=False,
+    )
+    label = escape(t("company_open", name=name))
+    button = (
+        f'<button type="button" class="company-open" data-review="{escape(payload)}" '
+        f'aria-haspopup="dialog" aria-label="{label}">{shown}</button>'
+    )
+    return f'<td class="company">{button}{badge}</td>'
+
+
+def _dou_page(url: str) -> str:
+    parsed = urlsplit(url)
+    if parsed.scheme == "https" and parsed.hostname == "jobs.dou.ua" and not parsed.username:
+        return url
+    return ""
+
+
+def _rate_badge(review: CompanyReview, t: Translator) -> str:
+    if review.rating is None:
+        return ""
+    if review.rating >= 70:
+        band = "good"
+    elif review.rating >= 50:
+        band = "mid"
+    else:
+        band = "low"
+    hint = escape(t("company_rate_hint", n=review.rating))
+    return (
+        f'<span class="crate crate-{band}" title="{hint}" aria-label="{hint}">'
+        f"{review.rating}</span>"
+    )
 
 
 def _boards(item: StoredJob, open_attrs: str) -> str:

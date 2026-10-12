@@ -93,7 +93,52 @@ CATALOG_JS = """
     if (!row.classList.contains("viewed")) change(row, { viewed: true });
   };
 
+  const dialog = document.getElementById("company-reviews");
+  const openCompany = (button) => {
+    const data = JSON.parse(button.dataset.review);
+    dialog.querySelector("h2").textContent = data.name;
+    const rate = dialog.querySelector(".company-rate");
+    const band = data.rating >= 70 ? "good" : data.rating >= 50 ? "mid" : "low";
+    rate.className = "company-rate" + (data.rating == null ? "" : " " + band);
+    const show = (node, text) => {
+      node.hidden = !text;
+      node.textContent = text || "";
+    };
+    show(rate, data.rating == null ? "" : fill(i18n.companyRate, { n: data.rating }));
+    show(
+      dialog.querySelector(".company-votes"),
+      data.votes ? fill(i18n.companyVotes, { n: data.votes }) : ""
+    );
+    show(
+      dialog.querySelector(".company-count"),
+      data.reviews ? fill(i18n.companyReviews, { n: data.reviews }) : ""
+    );
+    dialog.querySelector(".company-none").hidden = data.rating != null;
+    const list = dialog.querySelector(".company-links");
+    list.replaceChildren();
+    (data.links || []).forEach((link) => {
+      const item = document.createElement("li");
+      const anchor = document.createElement("a");
+      anchor.href = link.href;
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+      anchor.textContent = link.label;
+      item.append(anchor);
+      list.append(item);
+    });
+    dialog.showModal();
+  };
+  dialog.querySelector("[data-close]").addEventListener("click", () => dialog.close());
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) dialog.close();
+  });
+
   tbody.addEventListener("click", async (event) => {
+    const company = event.target.closest("button.company-open");
+    if (company) {
+      openCompany(company);
+      return;
+    }
     const row = event.target.closest("tr[data-url]");
     if (!row) return;
     if (event.target.closest("a[data-open]")) {

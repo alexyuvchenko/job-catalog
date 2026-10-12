@@ -122,6 +122,10 @@ CSS = """
       width: auto; height: auto; padding: 0 5px; background: var(--blue-soft);
       color: var(--blue); border-color: var(--blue-soft); font-size: 0.7rem; font-weight: 700;
     }
+    .swatch.sw-rate {
+      width: auto; height: auto; padding: 0 5px; background: var(--green-soft);
+      color: var(--green); border-color: var(--green-soft); font-size: 0.7rem; font-weight: 700;
+    }
     .table-wrap { border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
     tbody tr[hidden] { display: none; }
     table { width: 100%; border-collapse: collapse; background: var(--card); }
@@ -154,6 +158,38 @@ CSS = """
     tr.is-hidden .title { text-decoration: line-through; }
     a { color: var(--green); }
     .title { font-weight: 600; }
+    button.company-open {
+      background: none; color: inherit; border: 0; border-radius: 0; padding: 0;
+      font: inherit; font-weight: 600; text-align: left; cursor: pointer; display: inline;
+      text-decoration: underline; text-underline-offset: 2px;
+    }
+    button.company-open:hover { color: var(--green); }
+    .crate {
+      display: inline-block; margin-left: 6px; border-radius: 999px; padding: 0 6px;
+      font-size: 0.78rem; font-weight: 700; vertical-align: 1px; white-space: nowrap;
+    }
+    .crate-good { background: var(--green-soft); color: var(--green); }
+    .crate-mid { background: var(--amber-soft); color: var(--amber); }
+    .crate-low { background: var(--red-soft); color: var(--red); }
+    dialog#company-reviews {
+      border: 0; border-radius: 12px; padding: 0; color: var(--ink); background: var(--card);
+      width: min(32rem, calc(100vw - 24px)); max-height: calc(100dvh - 24px);
+    }
+    dialog#company-reviews::backdrop { background: rgba(28, 25, 21, 0.45); }
+    .company-dialog { padding: 16px 18px 18px; }
+    .company-dialog-head {
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+    }
+    .company-dialog h2 { margin: 0; font-size: 1.25rem; line-height: 1.3; }
+    .company-rate { margin: 12px 0 0; font-size: 1.35rem; font-weight: 700; }
+    .company-rate.good { color: var(--green); }
+    .company-rate.mid { color: var(--amber); }
+    .company-rate.low { color: var(--red); }
+    .company-votes, .company-count { margin: 4px 0 0; color: var(--muted); }
+    .company-none { margin: 12px 0 0; }
+    .company-links { margin: 12px 0; padding-left: 18px; }
+    .company-links a { font-weight: 600; }
+    .company-dialog .note { margin: 0; }
     .meta { color: var(--muted); font-size: 0.88rem; margin-top: 3px; }
     .meta a.board { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
     .meta a.board:hover { color: var(--green); }
@@ -324,7 +360,8 @@ CSS = """
 
     /* Touch screens: bigger targets, whatever the width. */
     @media (pointer: coarse) {
-      input:not([type="checkbox"]), select, button:not(.act):not(.star) { min-height: 44px; }
+      input:not([type="checkbox"]), select, button:not(.act):not(.star):not(.company-open) { min-height: 44px; }
+      button.company-open { min-height: 44px; padding: 8px 0; }
       label.checks { padding: 4px 0; }
       label.checks input { width: 1.3rem; height: 1.3rem; margin-top: 1px; }
       button.act { width: 40px; height: 40px; }

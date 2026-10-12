@@ -48,3 +48,19 @@ class SourceStatus:
     fetched: int = 0
     kept: int = 0
     complete: bool = True
+
+
+@dataclass
+class CompanyReview:
+    """DOU's published company score and the pages it comes from.
+
+    ``rating`` is the employee survey out of 100. Written reviews have no
+    numeric mark of their own, so they are linked instead of rescored.
+    """
+
+    rating: int | None
+    review_count: int
+    voter_count: int
+    reviews_url: str
+    poll_url: str
+    profile_url: str

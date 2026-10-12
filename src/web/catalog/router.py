@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
+from core.models import CompanyReview
 from jobs.refresh import CatalogService
 from storage.catalog import Catalog
 from storage.filters import CatalogFilters
@@ -198,9 +199,23 @@ def jobs(request: Request):
             "rating": item.marks.rating,
             "viewed": item.marks.viewed,
             "listings": [{"source": source, "url": url} for source, url in item.listings],
+            "company_review": _review_json(item.review),
         }
         for item in catalog.list_jobs(filters, user.id)
     ]
+
+
+def _review_json(review: CompanyReview | None) -> dict | None:
+    if review is None:
+        return None
+    return {
+        "rating": review.rating,
+        "review_count": review.review_count,
+        "voter_count": review.voter_count,
+        "reviews_url": review.reviews_url,
+        "poll_url": review.poll_url,
+        "profile_url": review.profile_url,
+    }
 
 
 @router.post("/refresh", status_code=303, response_model=None)

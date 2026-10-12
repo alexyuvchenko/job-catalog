@@ -50,6 +50,7 @@ class TestService:
         with (
             patch("jobs.refresh.run_search", return_value=([_job()], [status])),
             patch("jobs.refresh.write_outputs", side_effect=OSError("disk full")),
+            patch("jobs.refresh.update_company_reviews"),
         ):
             stats = service.refresh()
         assert stats.added == 1

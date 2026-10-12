@@ -35,6 +35,9 @@ _CLIENT_TEXT = {
     "loading": "loading",
     "loadError": "load_error",
     "showing": "showing",
+    "companyRate": "company_rate",
+    "companyVotes": "company_votes",
+    "companyReviews": "company_review_count",
 }
 
 
@@ -167,6 +170,20 @@ def render_catalog(view: CatalogView) -> str:
   {manual_links(t)}
   <p class="note">{escape(t("note_catalog"))}</p>
 </main>
+<dialog id="company-reviews" aria-labelledby="company-dialog-title">
+  <div class="company-dialog">
+    <div class="company-dialog-head">
+      <h2 id="company-dialog-title"></h2>
+      <button type="button" class="secondary" data-close>{escape(t("company_close"))}</button>
+    </div>
+    <p class="company-rate" hidden></p>
+    <p class="company-votes" hidden></p>
+    <p class="company-count" hidden></p>
+    <p class="company-none" hidden>{escape(t("company_no_score"))}</p>
+    <ul class="company-links"></ul>
+    <p class="note">{escape(t("company_note"))}</p>
+  </div>
+</dialog>
 <div id="toast" role="status" aria-live="polite" hidden><span></span><button type="button">{escape(t("toast_undo"))}</button></div>
 <script type="application/json" id="i18n">{client_json}</script>
 <script>{CATALOG_JS}</script>
@@ -265,6 +282,7 @@ def _legend(t: Translator) -> str:
         ("sw-closed", "", "legend_closed"),
         ("sw-viewed", "", "legend_viewed"),
         ("sw-en", "EN", "legend_en"),
+        ("sw-rate", "82", "legend_company"),
     ]
     body = "".join(
         f'<li><span class="swatch {css}" aria-hidden="true">{text}</span>{escape(t(key))}</li>'

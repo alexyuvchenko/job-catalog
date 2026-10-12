@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
+from typing import NamedTuple
 
 from core.classify import detect_language
-from core.models import Job, SourceStatus
+from core.models import CompanyReview, Job, SourceStatus
 from core.paths import CATALOG_PATH
 from storage.filters import MAX_RATING, CatalogFilters, apply_sort, is_visible
-from storage.group import group_same_positions, position_key_parts
+from storage.group import company_key, group_same_positions, position_key_parts
 from storage.records import JobMarks, MergeStats, StoredJob
 from storage.sqlite import connect
 from web.auth import (
@@ -28,6 +29,10 @@ from web.auth import (
 
 # A job counts as changed only when one of these differs. Dates and snippets are left out:
 # relative dates such as "2 weeks ago" shift every day without the vacancy changing.
+# A found company is read again after a week. A miss or a failed read is tried the next day.
+REVIEW_FOUND_TTL = timedelta(days=7)
+REVIEW_OTHER_TTL = timedelta(days=1)
+
 TRACKED_FIELDS = (
     "title",
     "company",
@@ -42,6 +47,14 @@ TRACKED_FIELDS = (
     "years",
     "category",
 )
+
+
+class CompanyTarget(NamedTuple):
+    """One active company that still needs a DOU review lookup."""
+
+    key: str
+    name: str
+    dou_url: str
 
 
 class Catalog:
@@ -144,12 +157,117 @@ class Catalog:
                 """,
                 (owner,),
             ).fetchall()
+            reviews = _reviews_by_key(connection)
         for row in rows:
             stored = _stored(row, cutoff)
             if is_visible(stored, filters):
                 found.append(stored)
         apply_sort(found, filters)
-        return group_same_positions(found)
+        grouped = group_same_positions(found)
+        for item in grouped:
+            item.review = reviews.get(company_key(item.job.company))
+        return grouped
+
+    def companies_due(self) -> list[CompanyTarget]:
+        """Active companies whose DOU review is missing or old enough to read again."""
+        with self._session() as connection:
+            jobs = connection.execute(
+                "SELECT company, company_url FROM jobs WHERE active = 1"
+            ).fetchall()
+            saved = {
+                row["company_key"]: (row["status"], row["checked_at"])
+                for row in connection.execute(
+                    "SELECT company_key, status, checked_at FROM company_reviews"
+                )
+            }
+        targets: dict[str, CompanyTarget] = {}
+        for row in jobs:
+            key = company_key(row["company"])
+            if not key:
+                continue
+            dou_url = _dou_company_url(row["company_url"])
+            current = targets.get(key)
+            if current is None:
+                targets[key] = CompanyTarget(key, " ".join(row["company"].split()), dou_url)
+            elif dou_url and not current.dou_url:
+                targets[key] = CompanyTarget(current.key, current.name, dou_url)
+        now = datetime.now()
+        due = []
+        for target in targets.values():
+            known = saved.get(target.key)
+            if known is None:
+                due.append(target)
+                continue
+            status, checked_at = known
+            checked = _parse_stamp(checked_at)
+            ttl = REVIEW_FOUND_TTL if status == "found" else REVIEW_OTHER_TTL
+            if checked is None or now - checked >= ttl:
+                due.append(target)
+        due.sort(key=lambda item: item.key)
+        return due
+
+    def save_company_review(
+        self,
+        key: str,
+        name: str,
+        review: CompanyReview | None,
+        status: str,
+    ) -> None:
+        """Store a DOU lookup. A failed read keeps a score that was already saved."""
+        if status not in {"found", "missing", "error"}:
+            raise ValueError(f"unknown review status {status}")
+        stamp = now_stamp()
+        with self._session() as connection:
+            if status == "error":
+                connection.execute(
+                    """
+                    INSERT INTO company_reviews (
+                        company_key, name, rating, review_count, voter_count,
+                        reviews_url, poll_url, profile_url, status, checked_at
+                    ) VALUES (?, ?, NULL, 0, 0, '', '', '', 'error', ?)
+                    ON CONFLICT(company_key) DO UPDATE SET checked_at = excluded.checked_at
+                    """,
+                    (key, name, stamp),
+                )
+                return
+            if status == "found" and review is None:
+                status = "missing"
+            rating = None if review is None else review.rating
+            review_count = 0 if review is None else review.review_count
+            voter_count = 0 if review is None else review.voter_count
+            reviews_url = "" if review is None else review.reviews_url
+            poll_url = "" if review is None else review.poll_url
+            profile_url = "" if review is None else review.profile_url
+            connection.execute(
+                """
+                INSERT INTO company_reviews (
+                    company_key, name, rating, review_count, voter_count,
+                    reviews_url, poll_url, profile_url, status, checked_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(company_key) DO UPDATE SET
+                    name = excluded.name,
+                    rating = excluded.rating,
+                    review_count = excluded.review_count,
+                    voter_count = excluded.voter_count,
+                    reviews_url = excluded.reviews_url,
+                    poll_url = excluded.poll_url,
+                    profile_url = excluded.profile_url,
+                    status = excluded.status,
+                    checked_at = excluded.checked_at
+                """,
+                (
+                    key,
+                    name,
+                    rating,
+                    review_count,
+                    voter_count,
+                    reviews_url,
+                    poll_url,
+                    profile_url,
+                    status,
+                    stamp,
+                ),
+            )
 
     def set_marks(
         self,
@@ -579,6 +697,18 @@ class Catalog:
                 filters TEXT NOT NULL DEFAULT '',
                 ui_language TEXT NOT NULL DEFAULT ''
             );
+            CREATE TABLE IF NOT EXISTS company_reviews (
+                company_key TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                rating INTEGER,
+                review_count INTEGER NOT NULL DEFAULT 0,
+                voter_count INTEGER NOT NULL DEFAULT 0,
+                reviews_url TEXT NOT NULL DEFAULT '',
+                poll_url TEXT NOT NULL DEFAULT '',
+                profile_url TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL,
+                checked_at TEXT NOT NULL
+            );
             CREATE INDEX IF NOT EXISTS jobs_source_active ON jobs(source, active);
             CREATE INDEX IF NOT EXISTS jobs_published ON jobs(published);
             """
@@ -635,6 +765,38 @@ def _migrate_marks(connection: sqlite3.Connection) -> None:
         """
     )
     connection.execute("PRAGMA foreign_keys=ON")
+
+
+def _reviews_by_key(connection: sqlite3.Connection) -> dict[str, CompanyReview]:
+    """Saved scores worth showing. A company with neither a score nor reviews is left out."""
+    found: dict[str, CompanyReview] = {}
+    for row in connection.execute("SELECT * FROM company_reviews WHERE status = 'found'"):
+        rating = None if row["rating"] is None else int(row["rating"])
+        review_count = int(row["review_count"])
+        if rating is None and not review_count:
+            continue
+        found[row["company_key"]] = CompanyReview(
+            rating=rating,
+            review_count=review_count,
+            voter_count=int(row["voter_count"]),
+            reviews_url=row["reviews_url"],
+            poll_url=row["poll_url"],
+            profile_url=row["profile_url"],
+        )
+    return found
+
+
+def _dou_company_url(url: str) -> str:
+    if "https://jobs.dou.ua/companies/" in (url or ""):
+        return url
+    return ""
+
+
+def _parse_stamp(value: str) -> datetime | None:
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
 
 
 def _sibling_urls(connection: sqlite3.Connection, url: str, title: str, company: str) -> list[str]:

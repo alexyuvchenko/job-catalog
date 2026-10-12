@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from core.models import Job
+from core.models import CompanyReview, Job
 
 
 @dataclass
@@ -43,6 +43,7 @@ class StoredJob:
     language: str = ""
     # Boards that list this same title at this company. Always includes the primary URL.
     listings: tuple[tuple[str, str], ...] = ()
+    review: CompanyReview | None = None
 
     @property
     def change(self) -> str:

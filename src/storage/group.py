@@ -16,9 +16,14 @@ def position_key(job: Job) -> tuple[str, str] | None:
     return position_key_parts(job.title, job.company)
 
 
+def company_key(company: str) -> str:
+    """Company name folded the same way a grouped row matches its siblings."""
+    return " ".join(company.split()).casefold()
+
+
 def position_key_parts(title: str, company: str) -> tuple[str, str] | None:
     folded_title = " ".join(title.split()).casefold()
-    folded_company = " ".join(company.split()).casefold()
+    folded_company = company_key(company)
     if not folded_title or not folded_company:
         return None
     return folded_title, folded_company

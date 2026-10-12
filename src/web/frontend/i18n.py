@@ -164,6 +164,29 @@ _TEXT: dict[str, dict[str, str]] = {
         "uk": "сірий фон — ви її вже відкривали",
         "en": "grey background — you already opened it",
     },
+    "legend_company": {
+        "uk": "число біля компанії — оцінка співробітників на DOU зі 100",
+        "en": "number by the company — DOU employee score out of 100",
+    },
+    "company_open": {"uk": "Відгуки про {name}", "en": "Reviews of {name}"},
+    "company_rate": {"uk": "{n} зі 100", "en": "{n} out of 100"},
+    "company_rate_hint": {
+        "uk": "Оцінка співробітників на DOU: {n} зі 100",
+        "en": "DOU employee score: {n} out of 100",
+    },
+    "company_votes": {"uk": "Проголосувало {n}", "en": "{n} employees voted"},
+    "company_review_count": {"uk": "{n} відгуків", "en": "{n} reviews"},
+    "company_no_score": {
+        "uk": "Оцінки співробітників на DOU немає.",
+        "en": "DOU has no employee score for this company.",
+    },
+    "company_note": {
+        "uk": "Число — це оцінка з анкети співробітників на DOU. Посилання відкривають відгуки і анкету. DOU не перевіряє кожен відгук, і ця оцінка не підтверджує бронювання.",
+        "en": "The number is the DOU employee survey score. The links open the written reviews and the survey. DOU does not check each review, and this score does not confirm reservation (бронювання).",
+    },
+    "company_close": {"uk": "Закрити", "en": "Close"},
+    "link_company_reviews": {"uk": "Відгуки на DOU", "en": "Reviews on DOU"},
+    "link_company_poll": {"uk": "Анкета співробітників", "en": "Employee survey"},
     # Paging
     "showing": {
         "uk": "Показано {first}–{last} із {total}",

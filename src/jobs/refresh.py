@@ -4,6 +4,7 @@ import logging
 import threading
 from datetime import datetime, timedelta
 
+from jobs.reviews import update_company_reviews
 from jobs.search import Query, run_search
 from storage.catalog import Catalog, now_stamp
 from storage.filters import CatalogFilters
@@ -98,6 +99,13 @@ class CatalogService:
                 stats.updated,
                 stats.deactivated,
             )
+            try:
+                update_company_reviews(self.catalog, cancelled=self._stop.is_set)
+            except Exception as exc:
+                log.exception("company reviews were not updated")
+                self.last_error = f"catalog was saved, but company reviews were not updated: {exc}"[
+                    :240
+                ]
             try:
                 stored = self.catalog.list_jobs(CatalogFilters(mine="all"))
                 write_outputs(
