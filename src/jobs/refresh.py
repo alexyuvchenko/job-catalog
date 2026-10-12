@@ -107,7 +107,9 @@ class CatalogService:
                 )
             except Exception as exc:
                 log.exception("catalog was saved, but out/ could not be written")
-                self.last_error = f"каталог збережено, файл звіту не записався: {exc}"[:240]
+                self.last_error = f"catalog was saved, but the report file was not written: {exc}"[
+                    :240
+                ]
             if self._stop.is_set():
                 log.info("catalog refresh stopped before every source finished")
             return stats

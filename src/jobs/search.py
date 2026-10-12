@@ -36,8 +36,8 @@ class Query:
 
 HTTP_SOURCES = (("Djinni", fetch_djinni), ("DOU", fetch_dou))
 BROWSER_SOURCES = (("Work.ua", fetch_workua), ("Robota.ua", fetch_robota))
-STOPPED = "оновлення зупинено, попередні вакансії лишаються"
-DISABLED = "тимчасово вимкнено, попередні вакансії лишаються"
+STOPPED = "refresh stopped; previous vacancies stay"
+DISABLED = "paused for now; previous vacancies stay"
 
 
 def run_search(
@@ -70,16 +70,14 @@ def run_search(
         filtered, dropped = verify_reservation(client, filtered, CACHE_PATH, query.refresh)
         for status in statuses:
             if status.name == "DOU" and status.ok:
-                status.message += f"; без бейджа відсіяно {dropped}"
+                status.message += f"; dropped {dropped} without the badge"
     elif query.verify and any(job.source == "DOU" for job in filtered):
         # Badge checks are not finished, so leave the previous DOU rows untouched.
         filtered = [job for job in filtered if job.source != "DOU"]
         for status in statuses:
             if status.name == "DOU" and status.ok:
                 status.complete = False
-                status.message += (
-                    "; перевірку бейджа зупинено, тож попередні вакансії DOU не знімаються"
-                )
+                status.message += "; badge check stopped, so previous DOU vacancies are not closed"
     else:
         for job in filtered:
             if job.source == "DOU":
@@ -141,7 +139,8 @@ def _as_listing(result: Listing | tuple) -> Listing:
     if isinstance(result, Listing):
         return result
     jobs, message = result
-    return Listing(list(jobs), str(message), complete="не знімаються" not in str(message))
+    text = str(message)
+    return Listing(list(jobs), text, complete="are not closed" not in text)
 
 
 def _collect_browser_sources(

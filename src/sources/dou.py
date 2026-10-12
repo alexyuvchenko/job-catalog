@@ -72,11 +72,11 @@ def fetch_jobs(client: Client, keyword: str, pages: int) -> Listing:
         last = bool(payload.get("last")) or added == 0
         loaded_pages += 1
     if total is not None:
-        message = f"прочитано {len(jobs)} IT-вакансій із близько {total} згадок «бронювання»"
+        message = f"read {len(jobs)} IT jobs from about {total} mentions of “бронювання”"
     else:
-        message = f"прочитано {len(jobs)} IT-вакансій зі згадкою «бронювання»"
+        message = f"read {len(jobs)} IT jobs mentioning “бронювання”"
     if stopped:
-        message += "; наступні сторінки не відкрились, тож попередні вакансії DOU не знімаються"
+        message += "; later pages did not open, so previous DOU vacancies are not closed"
     return Listing(jobs, message, complete=not stopped)
 
 

@@ -64,9 +64,9 @@ def fetch_jobs(browser: Browser, keyword: str, pages: int) -> Listing:
                 found.append(job)
         if not progressed:
             break
-    message = f"прочитано {len(found)} IT-вакансій за фільтром «Бронювання працівників»"
+    message = f"read {len(found)} IT jobs with the “Бронювання працівників” filter"
     if stopped:
-        message += "; наступні сторінки не відкрились, тож попередні вакансії Work.ua не знімаються"
+        message += "; later pages did not open, so previous Work.ua vacancies are not closed"
     return Listing(found, message, complete=not stopped)
 
 

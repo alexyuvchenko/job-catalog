@@ -119,12 +119,12 @@ class Browser:
         try:
             while self._blocked(selector):
                 if self.cancelled is not None and self.cancelled():
-                    raise FetchError("оновлення зупинено під час перевірки сайту")
+                    raise FetchError("refresh stopped during the site check")
                 if ticks >= _AUTO_TICKS or self._asks_for_human():
                     if not self.interactive:
                         raise FetchError(
-                            "сторінка просить підтвердити, що ви людина; "
-                            "запустіть оновлення кнопкою, коли ви біля комп’ютера"
+                            "the page is asking to verify you are human; "
+                            "start refresh with the button when you are at the computer"
                         )
                     if not prompted:
                         prompted = True
@@ -136,7 +136,7 @@ class Browser:
                             _host(url),
                         )
                 if ticks >= limit:
-                    raise FetchError("сторінка просить підтвердити, що ви людина")
+                    raise FetchError("the page is asking to verify you are human")
                 self.page.wait_for_timeout(_TICK_MS)
                 ticks += 1
         finally:

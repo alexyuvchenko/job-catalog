@@ -82,13 +82,11 @@ def fetch_jobs(browser: Browser, keyword: str, pages: int) -> Listing:
         if total is not None and len(seen) >= int(total):
             break
     if total is not None:
-        message = f"прочитано {len(found)} IT-вакансій із близько {total} віддалених із бронюванням"
+        message = f"read {len(found)} IT jobs from about {total} remote jobs with reservation"
     else:
-        message = f"прочитано {len(found)} віддалених IT-вакансій із бронюванням"
+        message = f"read {len(found)} remote IT jobs with reservation"
     if stopped:
-        message += (
-            "; наступні сторінки не відкрились, тож попередні вакансії Robota.ua не знімаються"
-        )
+        message += "; later pages did not open, so previous Robota.ua vacancies are not closed"
     return Listing(found, message, complete=not stopped)
 
 

@@ -50,7 +50,7 @@ class TestPartialRead:
             listing = fetch_djinni(Fake(), "", 5)
         assert len(listing.jobs) == 10
         assert not (listing.complete)
-        assert "не знімаються" in listing.message
+        assert "are not closed" in listing.message
 
     def test_djinni_that_reads_everything_is_complete(self):
         first_page = [_job(job_id=str(number), url=f"https://x/{number}") for number in range(3)]
@@ -147,7 +147,7 @@ class TestHumanCheckWait:
         browser.cancelled = lambda: True
         with pytest.raises(FetchError) as caught:
             browser._wait_for_check("https://ua.jooble.org/", None)
-        assert "зупинено" in str(caught.value)
+        assert "stopped" in str(caught.value)
         assert moves == []
 
 

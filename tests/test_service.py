@@ -54,20 +54,20 @@ class TestService:
             stats = service.refresh()
         assert stats.added == 1
         assert catalog.counts() == (1, 0)
-        assert "файл звіту не записався" in service.last_error
+        assert "report file was not written" in service.last_error
 
     def test_stopped_search_does_not_read_later_sources_or_keep_unverified_dou(self, tmp_path):
         calls = []
 
         def djinni(client, keyword, pages):
             calls.append("Djinni")
-            return [_job()], "прочитано 1"
+            return [_job()], "read 1"
 
         def dou(client, keyword, pages):
             calls.append("DOU")
             return [
                 _job(source="DOU", url="https://jobs.dou.ua/vacancies/1", job_id="d1")
-            ], "прочитано 1"
+            ], "read 1"
 
         def browser():
             raise AssertionError("Chrome should stay closed")
@@ -85,7 +85,7 @@ class TestService:
         by_name = {status.name: status for status in statuses}
         assert by_name["Djinni"].ok
         assert not (by_name["DOU"].complete)
-        assert "не знімаються" in by_name["DOU"].message
+        assert "are not closed" in by_name["DOU"].message
         assert by_name["Work.ua"].message == STOPPED
         assert by_name["Jooble"].message == DISABLED
         assert not (by_name["Jooble"].ok)

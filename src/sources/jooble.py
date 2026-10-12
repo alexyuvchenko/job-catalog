@@ -54,9 +54,9 @@ def fetch_jobs(browser: Browser, keyword: str, pages: int) -> Listing:
         if not cards:
             break
         found.extend(fresh)
-    message = f"прочитано {scanned} карток; залишено {len(found)}, де в тексті є бронювання"
+    message = f"read {scanned} cards; kept {len(found)} whose text mentions reservation"
     if stopped:
-        message += "; наступні сторінки не відкрились, тож попередні вакансії Jooble не знімаються"
+        message += "; later pages did not open, so previous Jooble vacancies are not closed"
     return Listing(found, message, complete=not stopped)
 
 
