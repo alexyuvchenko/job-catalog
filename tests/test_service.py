@@ -214,7 +214,7 @@ class TestService:
         )
         sign_in(phone, catalog)
         assert phone.get("/").status_code == 200
-        assert "лише на комп’ютері" in phone.get("/").text
+        assert 'action="/refresh"' not in phone.get("/").text
         assert len(phone.get("/api/jobs").json()) == 1
         refused = phone.post("/refresh", headers=origin, follow_redirects=False)
         assert refused.status_code == 403
@@ -226,7 +226,7 @@ class TestService:
         ):
             machine = TestClient(network, base_url=base, client=(peer, 50001))
             sign_in(machine, catalog)
-            assert "лише на комп’ютері" not in machine.get("/").text
+            assert 'action="/refresh"' in machine.get("/").text
             allowed = machine.post("/refresh", headers={"Origin": base}, follow_redirects=False)
             assert allowed.status_code == 303, base
 

@@ -98,10 +98,6 @@ _TEXT: dict[str, dict[str, str]] = {
     "reset": {"uk": "Скинути", "en": "Reset"},
     "refresh_now": {"uk": "Оновити зараз", "en": "Refresh now"},
     "refresh_running": {"uk": "Оновлення вже йде…", "en": "Refreshing…"},
-    "refresh_local": {
-        "uk": "Оновлення — лише на комп’ютері",
-        "en": "Refresh works only on the computer",
-    },
     # Table
     "th_date": {"uk": "Дата", "en": "Date"},
     "th_job": {"uk": "Вакансія", "en": "Job"},

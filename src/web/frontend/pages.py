@@ -324,11 +324,15 @@ def _form(view: CatalogView, t: Translator) -> str:
     min_rating = "" if filters.min_rating is None else str(filters.min_rating)
     full = " checked" if filters.full_remote_only else ""
     closed = " checked" if filters.include_inactive else ""
-    if not view.can_refresh:
-        button = t("refresh_local")
-    else:
-        button = t("refresh_running") if view.running else t("refresh_now")
-    disabled = " disabled" if view.running or not view.can_refresh else ""
+    button = t("refresh_running") if view.running else t("refresh_now")
+    disabled = " disabled" if view.running else ""
+    refresh_form = (
+        f"""<form class="bare" action="/refresh" method="post">
+      <button class="secondary" type="submit"{disabled}>{escape(button)}</button>
+    </form>"""
+        if view.can_refresh
+        else ""
+    )
     active = sum(
         1
         for name, _ in filter_params(filters, view.per_page)
@@ -386,9 +390,7 @@ def _form(view: CatalogView, t: Translator) -> str:
   <div class="actions">
     <button type="submit" form="filters">{escape(t("apply"))}</button>
     <a class="button secondary" href="/?reset=1">{escape(t("reset"))}</a>
-    <form class="bare" action="/refresh" method="post">
-      <button class="secondary" type="submit"{disabled}>{escape(button)}</button>
-    </form>
+    {refresh_form}
   </div>
 </details>"""
 
