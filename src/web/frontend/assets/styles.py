@@ -33,11 +33,26 @@ CSS = """
     }
     main { max-width: 1100px; margin: 0 auto; padding: 28px 20px 64px; }
     .topbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
-    .who { display: flex; align-items: center; gap: 10px; flex: none; margin-left: auto; }
-    .account { display: flex; align-items: center; gap: 8px; }
+    .who { display: flex; align-items: center; gap: 10px; flex: none; margin-left: auto; min-width: 0; }
+    .account { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .account form { flex: none; }
+    .identity {
+      display: flex; align-items: center; gap: 8px; position: relative;
+      min-width: 0; max-width: 14rem;
+    }
+    .avatar {
+      flex: none; width: 28px; height: 28px; border-radius: 50%;
+      display: grid; place-items: center;
+      background: var(--green-soft); color: var(--green);
+      font-size: 0.78rem; font-weight: 700; line-height: 1;
+    }
     .account .name {
-      font-size: 0.9rem; color: var(--muted); max-width: 12rem;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-size: 0.92rem; font-weight: 600; color: var(--ink);
+    }
+    .sr {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
     }
     .account button.secondary { padding: 4px 10px; }
     .auth { max-width: 28rem; }
@@ -309,8 +324,9 @@ CSS = """
       }
       h1 { font-size: 1.35rem; }
       .topbar { flex-direction: column; align-items: stretch; }
-      .who { margin-left: 0; justify-content: space-between; }
-      .account .name { max-width: 9rem; }
+      .who { margin-left: 0; justify-content: space-between; width: 100%; }
+      .account { flex: 1 1 auto; justify-content: flex-end; }
+      .identity { max-width: none; }
       .lede { font-size: 0.95rem; margin-bottom: 14px; }
       .panel { padding: 12px; border-radius: 10px; }
       .grid { grid-template-columns: 1fr; gap: 10px; }

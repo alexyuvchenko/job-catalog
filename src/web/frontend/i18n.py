@@ -287,7 +287,7 @@ _TEXT: dict[str, dict[str, str]] = {
         "uk": "Нові облікові записи зараз не створюються. Увійдіть, якщо запис уже є.",
         "en": "New accounts are not being created. Sign in if you already have one.",
     },
-    "account_label": {"uk": "Обліковий запис", "en": "Account"},
+    "signed_in_as": {"uk": "Ви увійшли як", "en": "Signed in as"},
     "auth_note": {
         "uk": "Бронювання — заява роботодавця, не автоматична відстрочка. Потрібні актуальні військово-облікові документи, а умови підтверджують на співбесіді.",
         "en": "Reservation (бронювання) is the employer’s statement, not an automatic deferment. Current military-registration documents are required, and the terms are confirmed in the interview.",

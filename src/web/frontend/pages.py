@@ -247,15 +247,30 @@ def _stat(view: CatalogView, text: str, count: int, change: str) -> str:
     return f'<a class="stat" href="/?{escape(urlencode(params))}">{escape(text)}</a>'
 
 
+def _initial(username: str) -> str:
+    """The letter in the account mark. A name with no letter keeps its first character."""
+    text = username.strip()
+    for char in text:
+        if char.isalpha():
+            upper = char.upper()
+            return upper if len(upper) == 1 else char
+    return text[:1] or "?"
+
+
 def _account(view: CatalogView, t: Translator) -> str:
     if not view.username:
         return ""
+    name = view.username
     return (
-        f'<div class="account" aria-label="{escape(t("account_label"))}">'
-        f'<span class="name">{escape(view.username)}</span>'
-        f'<form class="bare" action="/logout" method="post">'
+        '<div class="account">'
+        '<span class="identity">'
+        f'<span class="avatar" aria-hidden="true">{escape(_initial(name))}</span>'
+        f'<span class="sr">{escape(t("signed_in_as"))} </span>'
+        f'<span class="name" title="{escape(name)}" translate="no" dir="auto">{escape(name)}</span>'
+        "</span>"
+        '<form class="bare" action="/logout" method="post">'
         f'<button class="secondary" type="submit">{escape(t("sign_out"))}</button>'
-        f"</form></div>"
+        "</form></div>"
     )
 
 

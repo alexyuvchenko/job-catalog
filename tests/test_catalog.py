@@ -176,6 +176,20 @@ class TestCatalog:
         assert 'data-refreshing="1"' in page
         assert "http-equiv" not in page
 
+    def test_signed_in_name_is_an_identity_mark(self):
+        page = render_catalog(_view(username="олена"))
+        assert 'class="avatar" aria-hidden="true">О<' in page
+        assert 'class="sr">Ви увійшли як <' in page
+        assert 'class="name" title="олена" translate="no" dir="auto">олена<' in page
+
+        english = render_catalog(_view(language="en", username="alex"))
+        assert 'class="avatar" aria-hidden="true">A<' in english
+        assert "Signed in as" in english
+
+        odd = render_catalog(_view(username="<script>"))
+        assert 'title="&lt;script&gt;"' in odd
+        assert 'class="avatar" aria-hidden="true">S<' in odd
+
     def test_same_title_and_company_on_two_boards_is_one_row(self, tmp_path):
         catalog = Catalog(tmp_path / "catalog.sqlite")
         djinni = SourceStatus("Djinni", True, "ok", fetched=1, kept=1)
@@ -299,6 +313,12 @@ class TestCatalog:
         refresh = client.post("/refresh", follow_redirects=False)
         assert refresh.status_code == 303
         assert refresh.headers["location"] == "/"
+
+
+def _view(**overrides) -> CatalogView:
+    data = dict(items=[], total=0, page=1, per_page=50, filters=CatalogFilters())
+    data.update(overrides)
+    return CatalogView(**data)
 
 
 def _job(**overrides) -> Job:
