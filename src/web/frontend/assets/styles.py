@@ -17,6 +17,9 @@ CSS = """
       --blue: #2a4f94;
       --blue-soft: #e6eefb;
       --gold: #c58a00;
+      --gold-ink: #7a5804;
+      --gold-soft: #f6efd8;
+      --gold-line: #e2d0a2;
       --viewed: #eeebe4;
       --viewed-hover: #e8e4dc;
     }
@@ -240,12 +243,14 @@ CSS = """
     }
     button.act:hover { transform: translateY(-1px); }
     button.act:active { transform: scale(0.94); }
-    button.act.fav:hover { color: #b3261e; border-color: #e3aaa6; background: #fbeceb; }
+    button.act.fav:hover {
+      color: var(--gold-ink); border-color: var(--gold-line); background: var(--gold-soft);
+    }
     button.act.hide:hover { color: #2c2926; border-color: #c4bdb2; background: #f3efe9; }
     button.act.seen:hover { color: var(--green); border-color: #9fd0c0; background: var(--green-soft); }
     button.act.fav[aria-pressed="true"],
     button.act.fav[aria-pressed="true"]:hover {
-      color: #b3261e; border-color: #e3aaa6; background: #fbeceb;
+      color: var(--gold-ink); border-color: var(--gold-line); background: var(--gold-soft);
     }
     button.act.fav[aria-pressed="true"] svg path { fill: currentColor; }
     button.act.hide[aria-pressed="true"],
