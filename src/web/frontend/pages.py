@@ -136,7 +136,7 @@ def render_catalog(view: CatalogView) -> str:
 <main>
   <div class="topbar">
     <h1>{escape(t("title"))}</h1>
-    <div class="who">{_language_switch(view, t)}{_account(view, t)}</div>
+    <div class="who">{_account(view, t)}{_language_switch(view, t)}</div>
   </div>
   <p class="lede">{escape(t("lede_catalog"))}</p>
   {"".join(notices)}

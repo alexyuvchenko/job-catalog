@@ -181,6 +181,11 @@ class TestCatalog:
         assert 'class="avatar" aria-hidden="true">О<' in page
         assert 'class="sr">Ви увійшли як <' in page
         assert 'class="name" title="олена" translate="no" dir="auto">олена<' in page
+        assert (
+            page.index('class="name"')
+            < page.index('action="/logout"')
+            < page.index('class="langs"')
+        )
 
         english = render_catalog(_view(language="en", username="alex"))
         assert 'class="avatar" aria-hidden="true">A<' in english
