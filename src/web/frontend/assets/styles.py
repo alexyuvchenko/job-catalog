@@ -219,25 +219,43 @@ CSS = """
 
     /* Marks: favorite, not for me, viewed, and a rating. */
     td.mine { white-space: nowrap; }
-    .acts { display: flex; gap: 6px; }
+    .acts { display: flex; align-items: center; gap: 8px; }
     .stars { display: flex; margin-top: 4px; }
-    button.act, button.star {
-      background: transparent; color: var(--muted); border: 1px solid var(--line);
-      padding: 0; line-height: 1; font-variant-emoji: text;
-    }
-    button.act {
-      width: 30px; height: 30px; border-radius: 50%; font-size: 0.95rem; background: var(--card);
-    }
     button.star {
-      width: 22px; height: 24px; border: 0; border-radius: 4px; font-size: 1.05rem;
-      color: #d4cbbd;
+      background: transparent; color: #d4cbbd; border: 0; padding: 0; line-height: 1;
+      font-variant-emoji: text;
+      width: 22px; height: 24px; border-radius: 4px; font-size: 1.05rem;
     }
-    button.star.on { color: var(--gold); }
-    button.act:hover, button.star:hover { border-color: var(--green); }
-    button.star:hover { color: var(--gold); }
-    button.act.fav[aria-pressed="true"] { color: #b3261e; border-color: #e3aaa6; background: #fbeceb; }
-    button.act.hide[aria-pressed="true"] { color: white; background: #6b665e; border-color: #6b665e; }
-    button.act.seen[aria-pressed="true"] { color: var(--green); border-color: #9fd0c0; background: var(--green-soft); }
+    button.star.on, button.star:hover { color: var(--gold); }
+    button.act {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 32px; height: 32px; padding: 0; border-radius: 50%;
+      background: var(--card); color: #4a453e; border: 1px solid #d8d0c4;
+      transition: background 120ms ease, border-color 120ms ease, color 120ms ease, transform 120ms ease;
+    }
+    button.act svg { width: 16px; height: 16px; display: block; }
+    button.act svg path {
+      fill: none; stroke: currentColor; stroke-width: 2;
+      stroke-linecap: round; stroke-linejoin: round;
+    }
+    button.act:hover { transform: translateY(-1px); }
+    button.act:active { transform: scale(0.94); }
+    button.act.fav:hover { color: #b3261e; border-color: #e3aaa6; background: #fbeceb; }
+    button.act.hide:hover { color: #2c2926; border-color: #c4bdb2; background: #f3efe9; }
+    button.act.seen:hover { color: var(--green); border-color: #9fd0c0; background: var(--green-soft); }
+    button.act.fav[aria-pressed="true"],
+    button.act.fav[aria-pressed="true"]:hover {
+      color: #b3261e; border-color: #e3aaa6; background: #fbeceb;
+    }
+    button.act.fav[aria-pressed="true"] svg path { fill: currentColor; }
+    button.act.hide[aria-pressed="true"],
+    button.act.hide[aria-pressed="true"]:hover {
+      color: white; background: #6b665e; border-color: #6b665e;
+    }
+    button.act.seen[aria-pressed="true"],
+    button.act.seen[aria-pressed="true"]:hover {
+      color: var(--green); border-color: #9fd0c0; background: var(--green-soft);
+    }
     button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
       outline: 2px solid #1a73e8; outline-offset: 2px;
     }
@@ -367,6 +385,7 @@ CSS = """
       label.checks { padding: 4px 0; }
       label.checks input { width: 1.3rem; height: 1.3rem; margin-top: 1px; }
       button.act { width: 40px; height: 40px; }
+      button.act svg { width: 18px; height: 18px; }
       button.star { width: 34px; height: 40px; font-size: 1.3rem; }
       .pager a { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
     }

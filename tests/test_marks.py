@@ -301,6 +301,8 @@ class TestRender:
         assert "Changed: salary" in en
         assert "Not for me" in en
         assert "Мої позначки" not in en
+        assert uk.count("<svg") == 3 * len(items)
+        assert "♥" not in uk
 
     def test_report_page_has_no_actions_and_speaks_both_languages(self):
         for language, title in (("uk", "Віддалені IT-вакансії"), ("en", "Remote IT jobs")):

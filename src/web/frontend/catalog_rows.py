@@ -240,12 +240,32 @@ def _status(item: StoredJob, t: Translator) -> str:
     return f'<span class="{css}"{hint}>{escape(text)}</span>'
 
 
+# One stroke weight, one box. Text glyphs (♥ ✕ ✓) sit at different sizes.
+_ICONS = {
+    "fav": (
+        '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+        '<path d="M12 20.6 10.7 19.4C5.4 14.6 2 11.5 2 7.8 2 4.8 4.4 2.4 7.4 2.4c1.7 0 3.3.8 4.6 2.1 1.3-1.3 2.9-2.1 4.6-2.1 3 0 5.4 2.4 5.4 5.4 0 3.7-3.4 6.8-8.7 11.6z"/>'
+        "</svg>"
+    ),
+    "hide": (
+        '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+        '<path d="M7 7l10 10M17 7 7 17"/>'
+        "</svg>"
+    ),
+    "seen": (
+        '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+        '<path d="M5.5 12.4 10 16.8 18.5 7.6"/>'
+        "</svg>"
+    ),
+}
+
+
 def _mine(item: StoredJob, t: Translator) -> str:
     marks = item.marks
     buttons = [
-        _action("favorite", "fav", "♥", t("act_favorite"), marks.favorite),
-        _action("hidden", "hide", "✕", t("act_hide"), marks.hidden),
-        _action("viewed", "seen", "✓", t("act_viewed"), marks.viewed),
+        _action("favorite", "fav", t("act_favorite"), marks.favorite),
+        _action("hidden", "hide", t("act_hide"), marks.hidden),
+        _action("viewed", "seen", t("act_viewed"), marks.viewed),
     ]
     stars = []
     for value in range(1, MAX_RATING + 1):
@@ -264,12 +284,12 @@ def _mine(item: StoredJob, t: Translator) -> str:
     )
 
 
-def _action(name: str, css: str, symbol: str, label: str, pressed: bool) -> str:
+def _action(name: str, css: str, label: str, pressed: bool) -> str:
     text = escape(label)
     return (
         f'<button type="button" class="act {css}" data-act="{name}" '
         f'aria-pressed="{"true" if pressed else "false"}" aria-label="{text}" '
-        f'title="{text}">{symbol}</button>'
+        f'title="{text}">{_ICONS[css]}</button>'
     )
 
 
